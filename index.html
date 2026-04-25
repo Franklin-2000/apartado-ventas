@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tienda Online</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="estilos.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <!-- ===== PANTALLA LOGIN ===== -->
+  <div id="pantalla-login">
+    <div class="login-box">
+      <h1 class="logo-titulo">Mi Tienda</h1>
+      <p class="login-sub">Inicia sesión para comprar</p>
+      <button id="btnGoogle" class="btn-google">
+        <svg viewBox="0 0 48 48" width="22" height="22">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        </svg>
+        Continuar con Google
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== TIENDA PRINCIPAL ===== -->
+  <div id="pantalla-tienda" style="display:none;">
+
+    <!-- Header -->
+    <header class="tienda-header">
+      <h1 class="logo-header">Mi Tienda</h1>
+      <div class="header-acciones">
+        <button class="btn-carrito" id="btnAbrirCarrito">
+          🛒 <span class="carrito-badge" id="carritoCount">0</span>
+        </button>
+        <button class="btn-mis-pedidos" id="btnMisPedidos">Mis Pedidos</button>
+        <button class="btn-logout" id="btnLogout">Salir</button>
+      </div>
+    </header>
+
+    <!-- Buscador -->
+    <div class="buscador-section">
+      <input type="text" id="inputBuscar" placeholder="🔍  Buscar producto..." class="input-buscar">
+    </div>
+
+    <!-- Grid de productos -->
+    <main class="productos-grid" id="productosGrid">
+      <!-- Se llena dinámicamente -->
+    </main>
+
+    <div class="loading-msg" id="loadingMsg">Cargando productos...</div>
+    <div class="empty-msg" id="emptyMsg" style="display:none;">No hay productos disponibles.</div>
+  </div>
+
+  <!-- ===== PANEL CARRITO (lateral) ===== -->
+  <div class="carrito-overlay" id="carritoOverlay" style="display:none;"></div>
+  <aside class="carrito-panel" id="carritoPanel">
+    <div class="carrito-header">
+      <h2>Tu Carrito</h2>
+      <button class="btn-cerrar-carrito" id="btnCerrarCarrito">✕</button>
+    </div>
+    <div class="carrito-items" id="carritoItems">
+      <p class="carrito-vacio">Tu carrito está vacío.</p>
+    </div>
+    <div class="carrito-footer">
+      <div class="carrito-total">
+        <span>Total:</span>
+        <strong>$<span id="carritoTotal">0</span></strong>
+      </div>
+      <button class="btn-checkout" id="btnCheckout">Ir a pagar →</button>
+    </div>
+  </aside>
+
+  <!-- ===== MODAL CHECKOUT ===== -->
+  <div class="modal-overlay" id="modalCheckout" style="display:none;">
+    <div class="modal-box">
+      <button class="modal-cerrar" id="btnCerrarCheckout">✕</button>
+      <h2>Finalizar Pedido</h2>
+
+      <div class="checkout-resumen" id="checkoutResumen"></div>
+
+      <div class="checkout-form">
+        <label>Nombre completo *</label>
+        <input type="text" id="chkNombre" placeholder="Tu nombre">
+
+        <label>Teléfono *</label>
+        <input type="tel" id="chkTelefono" placeholder="Ej: 3001234567">
+
+        <label>Dirección de entrega *</label>
+        <input type="text" id="chkDireccion" placeholder="Calle, barrio, ciudad">
+
+        <label>Notas (opcional)</label>
+        <input type="text" id="chkNotas" placeholder="Instrucciones para el domiciliario">
+
+        <label>Método de pago *</label>
+        <div class="metodos-pago">
+          <label class="metodo-opcion">
+            <input type="radio" name="metodoPago" value="contraentrega" checked>
+            <span>💵 Contra entrega</span>
+          </label>
+          <label class="metodo-opcion">
+            <input type="radio" name="metodoPago" value="wompi">
+            <span>💳 Pagar online (Wompi)</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="checkout-total-final">
+        Total a pagar: <strong>$<span id="checkoutTotalFinal">0</span></strong>
+      </div>
+
+      <button class="btn-confirmar-pedido" id="btnConfirmarPedido">Confirmar Pedido</button>
+    </div>
+  </div>
+
+  <!-- ===== MODAL MIS PEDIDOS ===== -->
+  <div class="modal-overlay" id="modalMisPedidos" style="display:none;">
+    <div class="modal-box modal-box-wide">
+      <button class="modal-cerrar" id="btnCerrarMisPedidos">✕</button>
+      <h2>Mis Pedidos</h2>
+      <div id="listaMisPedidos" class="lista-pedidos-cliente">
+        <p>Cargando...</p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="tienda.js"></script>
+</body>
+</html>
