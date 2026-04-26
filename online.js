@@ -4,7 +4,8 @@
 // *** REEMPLAZA ESTOS VALORES ***
 const SB_URL          = "https://mhnhfdtdpryrjaeaymsa.supabase.co";
 const SB_KEY          = "sb_publishable_tiKyjeMyir7LD0EmFCdo8g_CqAXoM8R";
-const WOMPI_PUBLIC_KEY = "pub_test_XXXXXXXXXXXXXXXXXXXXXXXX"; // ← tu llave de wompi.co
+const WOMPI_PUBLIC_KEY = "pub_test_5eL1r2m92I05PsFi6Azw2ZP5cnyTKbcR"; // ← tu llave de wompi.co
+const WHATSAPP_ADMIN   = "573248298649"; // ← NÚMERO de WhatsApp del admin (sin +)
 
 const sb = supabase.createClient(SB_URL, SB_KEY);
 
@@ -355,11 +356,19 @@ btnConfirmarPedido.addEventListener('click', async () => {
         actualizarCarritoUI();
         modalCheckout.style.display = 'none';
         limpiarFormCheckout();
-        alert(
-            `✅ ¡Pedido #${pedidoData.id} recibido!\n\n` +
+        
+        const mensajeConfirmacion = `✅ ¡Pedido #${pedidoData.id} recibido!\n\n` +
             `Te contactaremos para coordinar la entrega.\n` +
-            `El pago se realizará al momento de la entrega.`
-        );
+            `El pago se realizará al momento de la entrega.`;
+        
+        alert(mensajeConfirmacion);
+        
+        // Redirigir automáticamente a WhatsApp para chatear con el vendedor
+        if (metodo === 'contraentrega') {
+            setTimeout(() => {
+                abrirWhatsAppAuto(direccion, nombre, pedidoData.id, total);
+            }, 1000);
+        }
 
     } catch (err) {
         console.error('Error al confirmar pedido:', err);
@@ -545,6 +554,52 @@ async function cargarMisPedidos() {
 
         listaMisPedidos.appendChild(card);
     });
+}
+
+// ================================================================
+// WHATSAPP AUTO —-redirige automáticamente después del pedido
+// ================================================================
+
+/**
+ * Abre WhatsApp automáticamente después de confirmar pedido
+ * @param {string} direccion - Dirección de entrega
+ * @param {string} nombre - Nombre del cliente
+ * @param {number} pedidoId - ID del pedido
+ * @param {number} total - Total del pedido
+ */
+function abrirWhatsAppAuto(direccion, nombre, pedidoId, total) {
+    // Crear mensaje con los detalles del pedido
+    const mensaje = `📦 *Nuevo Pedido #${pedidoId}*\n\n` +
+        `👤 *Cliente:* ${nombre}\n` +
+        `💰 *Total:* $${Number(total).toLocaleString('es-CO')}\n` +
+        `📍 *Dirección:* ${direccion}\n\n` +
+        `Hola, acabo de hacer un pedido y me gustaría coordinar la entrega.`;
+    
+    const mensajeEncoded = encodeURIComponent(mensaje);
+    const urlWhatsApp = `https://wa.me/${WHATSAPP_ADMIN}?text=${mensajeEncoded}`;
+    
+    console.log('Abriendo WhatsApp automáticamente:', urlWhatsApp);
+    
+    // Intentar abrir WhatsApp
+    const ventana = window.open(urlWhatsApp, '_blank');
+    
+    // Verificar si se abrió correctamente
+    if (!ventana || ventana.closed || typeof ventana.closed === 'undefined') {
+        // Popup bloqueado - copiar al portapapeles
+        console.log('Popup bloqueado - copiando al portapapeles');
+        
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(mensaje).then(() => {
+                alert('📱 Se copió el mensaje al portapapeles.\n\n' +
+                      'Abre WhatsApp y pega el mensaje para chatear con el vendedor.');
+                window.open('https://web.whatsapp.com', '_blank');
+            }).catch(() => {
+                prompt('Copia este mensaje y envíalo por WhatsApp:', mensaje);
+            });
+        } else {
+            prompt('Copia este mensaje y envíalo por WhatsApp:', mensaje);
+        }
+    }
 }
 
 // ================================================================
