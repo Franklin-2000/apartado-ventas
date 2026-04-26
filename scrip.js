@@ -1,60 +1,57 @@
 // ================================================================
-// TIENDA ONLINE — tienda.js
+// TIENDA ONLINE — scrip.js (versión definitiva)
 // ================================================================
-// IMPORTANTE: Reemplaza estos valores con los de tu proyecto Supabase
-const SB_URL = "https://mhnhfdtdpryrjaeaymsa.supabase.co";
-const SB_KEY = "sb_publishable_tiKyjeMyir7LD0EmFCdo8g_CqAXoM8R";
-
-// WOMPI: Reemplaza con tu llave pública de Wompi
-// La puedes encontrar en dashboard.wompi.co > Desarrolladores > API Keys
-const WOMPI_PUBLIC_KEY = "pub_test_XXXXXXXXXXXXXXXXXXXXXXXX";
+// *** REEMPLAZA ESTOS VALORES ***
+const SB_URL          = "https://mhnhfdtdpryrjaeaymsa.supabase.co";
+const SB_KEY          = "sb_publishable_tiKyjeMyir7LD0EmFCdo8g_CqAXoM8R";
+const WOMPI_PUBLIC_KEY = "pub_test_XXXXXXXXXXXXXXXXXXXXXXXX"; // ← tu llave de wompi.co
 
 const sb = supabase.createClient(SB_URL, SB_KEY);
 
 // ================================================================
 // ESTADO GLOBAL
 // ================================================================
-let currentUser   = null;
-let productos     = [];
-let carrito       = [];   // [{ producto, qty }]
+let currentUser = null;
+let productos   = [];
+let carrito     = [];   // [{ producto, qty }]
 
 // ================================================================
-// REFERENCIAS DOM
+// DOM
 // ================================================================
-const pantLogin       = document.getElementById('pantalla-login');
-const pantTienda      = document.getElementById('pantalla-tienda');
-const btnGoogle       = document.getElementById('btnGoogle');
-const btnLogout       = document.getElementById('btnLogout');
-const productosGrid   = document.getElementById('productosGrid');
-const loadingMsg      = document.getElementById('loadingMsg');
-const emptyMsg        = document.getElementById('emptyMsg');
-const inputBuscar     = document.getElementById('inputBuscar');
-const carritoCount    = document.getElementById('carritoCount');
-const carritoTotal    = document.getElementById('carritoTotal');
-const carritoItems    = document.getElementById('carritoItems');
-const carritoPanel    = document.getElementById('carritoPanel');
-const carritoOverlay  = document.getElementById('carritoOverlay');
-const btnAbrirCarrito = document.getElementById('btnAbrirCarrito');
-const btnCerrarCarrito= document.getElementById('btnCerrarCarrito');
-const btnCheckout     = document.getElementById('btnCheckout');
-const modalCheckout   = document.getElementById('modalCheckout');
-const btnCerrarCheckout = document.getElementById('btnCerrarCheckout');
-const btnConfirmarPedido = document.getElementById('btnConfirmarPedido');
-const checkoutResumen = document.getElementById('checkoutResumen');
-const checkoutTotalFinal = document.getElementById('checkoutTotalFinal');
-const btnMisPedidos   = document.getElementById('btnMisPedidos');
-const modalMisPedidos = document.getElementById('modalMisPedidos');
+const pantLogin           = document.getElementById('pantalla-login');
+const pantTienda          = document.getElementById('pantalla-tienda');
+const btnGoogle           = document.getElementById('btnGoogle');
+const btnLogout           = document.getElementById('btnLogout');
+const productosGrid       = document.getElementById('productosGrid');
+const loadingMsg          = document.getElementById('loadingMsg');
+const emptyMsg            = document.getElementById('emptyMsg');
+const inputBuscar         = document.getElementById('inputBuscar');
+const carritoCount        = document.getElementById('carritoCount');
+const carritoTotal        = document.getElementById('carritoTotal');
+const carritoItems        = document.getElementById('carritoItems');
+const carritoPanel        = document.getElementById('carritoPanel');
+const carritoOverlay      = document.getElementById('carritoOverlay');
+const btnAbrirCarrito     = document.getElementById('btnAbrirCarrito');
+const btnCerrarCarrito    = document.getElementById('btnCerrarCarrito');
+const btnCheckout         = document.getElementById('btnCheckout');
+const modalCheckout       = document.getElementById('modalCheckout');
+const btnCerrarCheckout   = document.getElementById('btnCerrarCheckout');
+const btnConfirmarPedido  = document.getElementById('btnConfirmarPedido');
+const checkoutResumen     = document.getElementById('checkoutResumen');
+const checkoutTotalFinal  = document.getElementById('checkoutTotalFinal');
+const btnMisPedidos       = document.getElementById('btnMisPedidos');
+const modalMisPedidos     = document.getElementById('modalMisPedidos');
 const btnCerrarMisPedidos = document.getElementById('btnCerrarMisPedidos');
-const listaMisPedidos = document.getElementById('listaMisPedidos');
+const listaMisPedidos     = document.getElementById('listaMisPedidos');
 
 // ================================================================
-// AUTH
+// AUTH — Login con Google
 // ================================================================
 async function checkAuth() {
     const { data: { session } } = await sb.auth.getSession();
     if (session) {
         currentUser = session.user;
-        mostrarTienda();
+        await mostrarTienda();
     } else {
         mostrarLogin();
     }
@@ -69,7 +66,7 @@ async function mostrarTienda() {
     pantLogin.style.display = 'none';
     pantTienda.style.display = 'block';
     await cargarProductos();
-    verificarPagoWompi(); // Verifica si venimos de un redirect de Wompi
+    verificarRetornoWompi();
 }
 
 btnGoogle.addEventListener('click', async () => {
@@ -87,13 +84,13 @@ btnLogout.addEventListener('click', async () => {
 });
 
 // ================================================================
-// CARGAR PRODUCTOS DESDE SUPABASE
-// Muestra solo los productos con cantidad > 0
+// PRODUCTOS — carga desde Supabase
+// Solo muestra los que tienen stock > 0
 // ================================================================
 async function cargarProductos() {
     loadingMsg.style.display = 'block';
-    productosGrid.innerHTML = '';
-    emptyMsg.style.display = 'none';
+    productosGrid.innerHTML  = '';
+    emptyMsg.style.display   = 'none';
 
     const { data, error } = await sb
         .from('productos')
@@ -104,25 +101,20 @@ async function cargarProductos() {
     loadingMsg.style.display = 'none';
 
     if (error) {
-        console.error('Error cargando productos:', error);
-        emptyMsg.style.display = 'block';
-        emptyMsg.textContent = 'Error al cargar productos. Intenta de nuevo.';
+        emptyMsg.style.display  = 'block';
+        emptyMsg.textContent    = 'Error al cargar productos. Intenta de nuevo.';
+        console.error(error);
         return;
     }
 
     productos = data || [];
-
-    if (productos.length === 0) {
-        emptyMsg.style.display = 'block';
-        return;
-    }
-
+    if (productos.length === 0) { emptyMsg.style.display = 'block'; return; }
     renderProductos(productos);
 }
 
 function renderProductos(lista) {
     productosGrid.innerHTML = '';
-    emptyMsg.style.display = lista.length === 0 ? 'block' : 'none';
+    emptyMsg.style.display  = lista.length === 0 ? 'block' : 'none';
 
     lista.forEach((p, i) => {
         const card = document.createElement('div');
@@ -130,11 +122,10 @@ function renderProductos(lista) {
         card.style.animationDelay = `${i * 0.05}s`;
 
         const agotado = p.cantidad === 0;
-        const codigoKey = p.codigoBarras || p['codigoBarras'] || '';
 
         card.innerHTML = `
-            <img src="${p.imagen || 'https://via.placeholder.com/300x200?text=Sin+imagen'}" 
-                 alt="${p.nombre}" 
+            <img src="${p.imagen || 'https://via.placeholder.com/300x200?text=Sin+imagen'}"
+                 alt="${p.nombre}"
                  onerror="this.src='https://via.placeholder.com/300x200?text=Sin+imagen'">
             <div class="tarjeta-info">
                 <div class="tarjeta-nombre">${p.nombre}</div>
@@ -148,10 +139,7 @@ function renderProductos(lista) {
             </button>
         `;
 
-        card.querySelector('.btn-agregar').addEventListener('click', () => {
-            agregarAlCarrito(p);
-        });
-
+        card.querySelector('.btn-agregar').addEventListener('click', () => agregarAlCarrito(p));
         productosGrid.appendChild(card);
     });
 }
@@ -160,31 +148,27 @@ function renderProductos(lista) {
 inputBuscar.addEventListener('input', () => {
     const term = inputBuscar.value.trim().toLowerCase();
     if (!term) { renderProductos(productos); return; }
-    const filtrados = productos.filter(p =>
+    renderProductos(productos.filter(p =>
         p.nombre.toLowerCase().includes(term) ||
         (p['codigoBarras'] && p['codigoBarras'].includes(term))
-    );
-    renderProductos(filtrados);
+    ));
 });
 
 // ================================================================
 // CARRITO
 // ================================================================
 function agregarAlCarrito(producto) {
-    const existente = carrito.find(i => i.producto.id === producto.id);
+    const existente      = carrito.find(i => i.producto.id === producto.id);
+    const enCarrito      = existente ? existente.qty : 0;
     const stockDisponible = producto.cantidad;
-    const enCarrito = existente ? existente.qty : 0;
 
     if (enCarrito >= stockDisponible) {
         alert(`Solo hay ${stockDisponible} unidades disponibles de "${producto.nombre}".`);
         return;
     }
 
-    if (existente) {
-        existente.qty++;
-    } else {
-        carrito.push({ producto, qty: 1 });
-    }
+    if (existente) { existente.qty++; }
+    else           { carrito.push({ producto, qty: 1 }); }
 
     actualizarCarritoUI();
     abrirCarrito();
@@ -208,7 +192,7 @@ function cambiarQty(productoId, delta) {
 }
 
 function actualizarCarritoUI() {
-    const totalItems = carrito.reduce((s, i) => s + i.qty, 0);
+    const totalItems  = carrito.reduce((s, i) => s + i.qty, 0);
     const totalPrecio = carrito.reduce((s, i) => s + i.qty * Number(i.producto.precio), 0);
 
     carritoCount.textContent = totalItems;
@@ -247,17 +231,15 @@ function actualizarCarritoUI() {
             cambiarQty(parseInt(btn.dataset.id), parseInt(btn.dataset.delta))
         );
     });
-
     carritoItems.querySelectorAll('.btn-quitar-item').forEach(btn => {
         btn.addEventListener('click', () => quitarDelCarrito(parseInt(btn.dataset.id)));
     });
 }
 
-function abrirCarrito() {
+function abrirCarrito()  {
     carritoOverlay.style.display = 'block';
     carritoPanel.classList.add('abierto');
 }
-
 function cerrarCarrito() {
     carritoOverlay.style.display = 'none';
     carritoPanel.classList.remove('abierto');
@@ -268,7 +250,7 @@ btnCerrarCarrito.addEventListener('click', cerrarCarrito);
 carritoOverlay.addEventListener('click', cerrarCarrito);
 
 // ================================================================
-// CHECKOUT
+// CHECKOUT — resumen y formulario
 // ================================================================
 btnCheckout.addEventListener('click', () => {
     if (carrito.length === 0) { alert('Tu carrito está vacío.'); return; }
@@ -277,7 +259,6 @@ btnCheckout.addEventListener('click', () => {
 });
 
 function abrirModalCheckout() {
-    // Llenar resumen
     const total = carrito.reduce((s, i) => s + i.qty * Number(i.producto.precio), 0);
     checkoutResumen.innerHTML = carrito.map(item => `
         <div class="checkout-resumen-item">
@@ -286,19 +267,25 @@ function abrirModalCheckout() {
         </div>
     `).join('');
     checkoutTotalFinal.textContent = total.toLocaleString('es-CO');
-    modalCheckout.style.display = 'flex';
+    modalCheckout.style.display   = 'flex';
 }
 
-btnCerrarCheckout.addEventListener('click', () => {
-    modalCheckout.style.display = 'none';
-});
+btnCerrarCheckout.addEventListener('click',  () => { modalCheckout.style.display = 'none'; });
+modalCheckout.addEventListener('click', e => { if (e.target === modalCheckout) modalCheckout.style.display = 'none'; });
 
-modalCheckout.addEventListener('click', (e) => {
-    if (e.target === modalCheckout) modalCheckout.style.display = 'none';
-});
+function limpiarFormCheckout() {
+    document.getElementById('chkNombre').value    = '';
+    document.getElementById('chkTelefono').value  = '';
+    document.getElementById('chkDireccion').value = '';
+    document.getElementById('chkNotas').value     = '';
+    document.querySelector('input[name="metodoPago"][value="contraentrega"]').checked = true;
+}
 
 // ================================================================
 // CONFIRMAR PEDIDO
+// El pedido se guarda en estado 'pendiente' o 'esperando_pago'.
+// El inventario NO se toca aquí — lo hace el trigger en Supabase
+// cuando el admin confirma el pago.
 // ================================================================
 btnConfirmarPedido.addEventListener('click', async () => {
     const nombre    = document.getElementById('chkNombre').value.trim();
@@ -314,11 +301,16 @@ btnConfirmarPedido.addEventListener('click', async () => {
 
     const total = carrito.reduce((s, i) => s + i.qty * Number(i.producto.precio), 0);
 
-    btnConfirmarPedido.disabled = true;
+    btnConfirmarPedido.disabled    = true;
     btnConfirmarPedido.textContent = 'Procesando...';
 
     try {
-        // 1. Insertar pedido en Supabase
+        // 1. Crear el pedido en Supabase
+        //    Estado inicial según método de pago:
+        //    - contraentrega → 'pendiente'    (admin confirma manualmente)
+        //    - wompi         → 'esperando_pago' (se actualiza cuando Wompi confirma)
+        const estadoInicial = metodo === 'contraentrega' ? 'pendiente' : 'esperando_pago';
+
         const { data: pedidoData, error: pedidoError } = await sb
             .from('pedidos')
             .insert([{
@@ -326,12 +318,11 @@ btnConfirmarPedido.addEventListener('click', async () => {
                 cliente_nombre: nombre,
                 cliente_email:  currentUser.email,
                 cliente_tel:    telefono,
-                direccion:      direccion,
-                notas:          notas,
-                total:          total,
+                direccion,
+                notas,
+                total,
                 metodo_pago:    metodo,
-                // contra entrega → pendiente | online → esperando_pago
-                estado:         metodo === 'contraentrega' ? 'pendiente' : 'esperando_pago',
+                estado:         estadoInicial,
                 fecha:          new Date().toISOString()
             }])
             .select()
@@ -339,7 +330,7 @@ btnConfirmarPedido.addEventListener('click', async () => {
 
         if (pedidoError) throw pedidoError;
 
-        // 2. Insertar items del pedido
+        // 2. Guardar los items del pedido
         const items = carrito.map(i => ({
             pedido_id:  pedidoData.id,
             product_id: i.producto.id,
@@ -352,77 +343,70 @@ btnConfirmarPedido.addEventListener('click', async () => {
         const { error: itemsError } = await sb.from('items_pedido').insert(items);
         if (itemsError) throw itemsError;
 
-        // 3. Si pago online → redirigir a Wompi
+        // 3. Wompi: redirigir al checkout de pago
         if (metodo === 'wompi') {
             redirigirWompi(pedidoData, total, nombre, currentUser.email, telefono);
-            return; // No limpiamos carrito aquí, lo hacemos al volver de Wompi
+            return;
         }
 
-        // 4. Si es contra entrega → éxito directo
+        // 4. Contra entrega: confirmar al usuario
+        //    El inventario NO se descuenta todavía — lo hace el admin al confirmar
         carrito = [];
         actualizarCarritoUI();
         modalCheckout.style.display = 'none';
         limpiarFormCheckout();
-        alert(`✅ ¡Pedido registrado! Número de pedido: #${pedidoData.id}\nTe contactaremos para coordinar la entrega.`);
+        alert(
+            `✅ ¡Pedido #${pedidoData.id} recibido!\n\n` +
+            `Te contactaremos para coordinar la entrega.\n` +
+            `El pago se realizará al momento de la entrega.`
+        );
 
     } catch (err) {
         console.error('Error al confirmar pedido:', err);
         alert('Hubo un error al procesar tu pedido. Intenta de nuevo.');
     } finally {
-        btnConfirmarPedido.disabled = false;
+        btnConfirmarPedido.disabled    = false;
         btnConfirmarPedido.textContent = 'Confirmar Pedido';
     }
 });
 
-function limpiarFormCheckout() {
-    document.getElementById('chkNombre').value = '';
-    document.getElementById('chkTelefono').value = '';
-    document.getElementById('chkDireccion').value = '';
-    document.getElementById('chkNotas').value = '';
-    document.querySelector('input[name="metodoPago"][value="contraentrega"]').checked = true;
-}
-
 // ================================================================
-// WOMPI — PAGO ONLINE
-// Documentación: https://docs.wompi.co/docs/colombia/widget-checkout
+// WOMPI — redirección al checkout
 // ================================================================
 function redirigirWompi(pedido, total, nombre, email, telefono) {
-    // Wompi recibe el monto en centavos
     const montoCentavos = Math.round(total * 100);
+    const referencia    = `PEDIDO-${pedido.id}-${Date.now()}`;
+    const urlRetorno    = `${window.location.origin}${window.location.pathname}?pedido_id=${pedido.id}&referencia=${referencia}`;
 
-    // Referencia única del pedido
-    const referencia = `PEDIDO-${pedido.id}-${Date.now()}`;
-
-    // URL de retorno después del pago
-    const urlRetorno = `${window.location.origin}${window.location.pathname}?pedido_id=${pedido.id}&referencia=${referencia}`;
-
-    // Construir URL del widget de Wompi
     const wompiUrl = new URL('https://checkout.wompi.co/p/');
-    wompiUrl.searchParams.set('public-key',          WOMPI_PUBLIC_KEY);
-    wompiUrl.searchParams.set('currency',             'COP');
-    wompiUrl.searchParams.set('amount-in-cents',      montoCentavos);
-    wompiUrl.searchParams.set('reference',            referencia);
-    wompiUrl.searchParams.set('redirect-url',         urlRetorno);
+    wompiUrl.searchParams.set('public-key',                    WOMPI_PUBLIC_KEY);
+    wompiUrl.searchParams.set('currency',                      'COP');
+    wompiUrl.searchParams.set('amount-in-cents',               montoCentavos);
+    wompiUrl.searchParams.set('reference',                     referencia);
+    wompiUrl.searchParams.set('redirect-url',                  urlRetorno);
     wompiUrl.searchParams.set('customer-data:email',           email);
     wompiUrl.searchParams.set('customer-data:full-name',       nombre);
     wompiUrl.searchParams.set('customer-data:phone-number',    telefono);
     wompiUrl.searchParams.set('customer-data:phone-number-prefix', '+57');
 
-    // Guardar pedido_id en localStorage para recuperarlo al volver
-    localStorage.setItem('wompi_pedido_id', pedido.id);
+    localStorage.setItem('wompi_pedido_id',  pedido.id);
     localStorage.setItem('wompi_referencia', referencia);
 
     window.location.href = wompiUrl.toString();
 }
 
-/**
- * Se llama al cargar la página. Detecta si venimos de un redirect de Wompi
- * y actualiza el estado del pedido según el resultado del pago.
- */
-async function verificarPagoWompi() {
-    const params = new URLSearchParams(window.location.search);
-    const pedidoId   = params.get('pedido_id');
-    const referencia = params.get('referencia');
+// ================================================================
+// WOMPI — retorno después del pago
+// Cuando Wompi redirige de vuelta a la tienda, verificamos el
+// estado de la transacción y actualizamos el pedido.
+//
+// Si el pago fue APROBADO → estado 'pago_confirmado'
+// Esto dispara el trigger que descuenta el inventario automáticamente.
+// ================================================================
+async function verificarRetornoWompi() {
+    const params      = new URLSearchParams(window.location.search);
+    const pedidoId    = params.get('pedido_id');
+    const referencia  = params.get('referencia');
 
     if (!pedidoId || !referencia) return;
 
@@ -430,56 +414,66 @@ async function verificarPagoWompi() {
     window.history.replaceState({}, '', window.location.pathname);
 
     try {
-        // Consultar estado de la transacción en Wompi
-        const res = await fetch(`https://production.wompi.co/v1/transactions?reference=${referencia}`, {
+        // Consultar estado en la API de Wompi
+        // En producción usa: https://production.wompi.co/v1/transactions
+        // En pruebas usa:    https://sandbox.wompi.co/v1/transactions
+        const res  = await fetch(`https://sandbox.wompi.co/v1/transactions?reference=${referencia}`, {
             headers: { 'Authorization': `Bearer ${WOMPI_PUBLIC_KEY}` }
         });
         const json = await res.json();
         const transacciones = json.data || [];
-
-        // Buscamos si alguna transacción fue APPROVED
         const aprobada = transacciones.find(t => t.status === 'APPROVED');
 
         if (aprobada) {
-            // Actualizar estado del pedido a 'pagado'
-            await sb.from('pedidos')
-                .update({ estado: 'pagado', wompi_transaction_id: aprobada.id })
+            // Pago aprobado → 'pago_confirmado'
+            // El trigger de Supabase descuenta el inventario al recibir este estado
+            const { error } = await sb
+                .from('pedidos')
+                .update({
+                    estado:               'pago_confirmado',
+                    wompi_transaction_id: aprobada.id
+                })
                 .eq('id', parseInt(pedidoId));
+
+            if (error) throw error;
 
             carrito = [];
             actualizarCarritoUI();
             limpiarFormCheckout();
-
-            alert(`✅ ¡Pago aprobado! Tu pedido #${pedidoId} ha sido confirmado.\nTe llegará una notificación cuando sea despachado.`);
+            alert(
+                `✅ ¡Pago aprobado!\n` +
+                `Tu pedido #${pedidoId} fue confirmado y el inventario actualizado.\n` +
+                `Recibirás tu pedido pronto.`
+            );
         } else {
-            // Pago fallido o pendiente → marcar como fallido
-            await sb.from('pedidos')
+            // Pago fallido o pendiente
+            await sb
+                .from('pedidos')
                 .update({ estado: 'pago_fallido' })
                 .eq('id', parseInt(pedidoId));
 
-            alert(`❌ El pago no pudo completarse. Tu pedido #${pedidoId} fue marcado como fallido. Puedes intentarlo de nuevo.`);
+            alert(
+                `❌ El pago no pudo completarse.\n` +
+                `Tu pedido #${pedidoId} fue marcado como fallido.\n` +
+                `Puedes intentarlo de nuevo desde "Mis Pedidos".`
+            );
         }
-
     } catch (err) {
         console.error('Error verificando pago Wompi:', err);
-        // No bloqueamos al usuario si la verificación falla
     }
 }
 
 // ================================================================
-// MIS PEDIDOS
+// MIS PEDIDOS — el cliente ve el estado de sus pedidos
 // ================================================================
 btnMisPedidos.addEventListener('click', async () => {
-    modalMisPedidos.style.display = 'flex';
-    listaMisPedidos.innerHTML = '<p>Cargando...</p>';
+    modalMisPedidos.style.display  = 'flex';
+    listaMisPedidos.innerHTML      = '<p>Cargando...</p>';
     await cargarMisPedidos();
 });
 
-btnCerrarMisPedidos.addEventListener('click', () => {
-    modalMisPedidos.style.display = 'none';
-});
-
-modalMisPedidos.addEventListener('click', (e) => {
+btnCerrarMisPedidos.addEventListener('click', () => { modalMisPedidos.style.display = 'none'; });
+modalMisPedidos.addEventListener('click', e => {
     if (e.target === modalMisPedidos) modalMisPedidos.style.display = 'none';
 });
 
@@ -502,25 +496,19 @@ async function cargarMisPedidos() {
 
     listaMisPedidos.innerHTML = '';
 
+    const etiquetaEstado = {
+        pendiente:       { texto: 'Pendiente — contra entrega',    clase: 'estado-pendiente'  },
+        esperando_pago:  { texto: 'Esperando pago online',         clase: 'estado-pendiente'  },
+        pago_confirmado: { texto: '✅ Pago confirmado',            clase: 'estado-pagado'     },
+        despachado:      { texto: '🚚 En camino',                  clase: 'estado-despachado' },
+        entregado:       { texto: '📦 Entregado',                  clase: 'estado-entregado'  },
+        pago_fallido:    { texto: '❌ Pago fallido',               clase: 'estado-cancelado'  },
+        cancelado:       { texto: '🚫 Cancelado',                  clase: 'estado-cancelado'  },
+    };
+
     data.forEach(pedido => {
         const fecha = new Date(pedido.fecha).toLocaleString('es-CO');
-        const etiquetaEstado = {
-            pendiente:      'Pendiente',
-            esperando_pago: 'Esperando pago',
-            pagado:         'Pagado',
-            entregado:      'Entregado',
-            pago_fallido:   'Pago fallido',
-            cancelado:      'Cancelado'
-        }[pedido.estado] || pedido.estado;
-
-        const claseEstado = {
-            pendiente:      'estado-pendiente',
-            esperando_pago: 'estado-pendiente',
-            pagado:         'estado-pagado',
-            entregado:      'estado-entregado',
-            pago_fallido:   'estado-cancelado',
-            cancelado:      'estado-cancelado'
-        }[pedido.estado] || 'estado-pendiente';
+        const etq   = etiquetaEstado[pedido.estado] || { texto: pedido.estado, clase: '' };
 
         const card = document.createElement('div');
         card.className = 'pedido-card';
@@ -530,13 +518,16 @@ async function cargarMisPedidos() {
                     <div class="pedido-num">Pedido #${pedido.id}</div>
                     <div class="pedido-fecha">${fecha}</div>
                 </div>
-                <span class="pedido-estado ${claseEstado}">${etiquetaEstado}</span>
+                <span class="pedido-estado ${etq.clase}">${etq.texto}</span>
                 <div class="pedido-total-header">$${Number(pedido.total).toLocaleString('es-CO')}</div>
             </div>
             <div class="pedido-card-body">
                 <ul>
                     ${pedido.items_pedido.map(i =>
-                        `<li><span>${i.cantidad}x ${i.nombre}</span><span>$${Number(i.subtotal).toLocaleString('es-CO')}</span></li>`
+                        `<li>
+                            <span>${i.cantidad}x ${i.nombre}</span>
+                            <span>$${Number(i.subtotal).toLocaleString('es-CO')}</span>
+                        </li>`
                     ).join('')}
                 </ul>
                 <div class="pedido-info-extra">
@@ -557,8 +548,16 @@ async function cargarMisPedidos() {
 }
 
 // ================================================================
-// INICIALIZACIÓN
+// INIT
 // ================================================================
 document.addEventListener('DOMContentLoaded', () => {
     checkAuth();
+
+    // Escucha cambios de sesión (ej: cuando Google redirige de vuelta)
+    sb.auth.onAuthStateChange((_event, session) => {
+        if (session && !currentUser) {
+            currentUser = session.user;
+            mostrarTienda();
+        }
+    });
 });
