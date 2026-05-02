@@ -4,8 +4,8 @@
 // *** REEMPLAZA ESTOS VALORES ***
 const SB_URL          = "https://mhnhfdtdpryrjaeaymsa.supabase.co";
 const SB_KEY          = "sb_publishable_tiKyjeMyir7LD0EmFCdo8g_CqAXoM8R";
-const WOMPI_PUBLIC_KEY = "pub_test_5eL1r2m92I05PsFi6Azw2ZP5cnyTKbcR"; // ← tu llave de wompi.co
-const WOMPI_INTEGRITY_SECRET = "prod_integrity_VBDyjlMtrZRMZMSG8r9L71yenBNo3zQ7"; // ← del dashboard Wompi
+const WOMPI_PUBLIC_KEY = "pub_test_5eL1r2m92I05PsFi6Azw2ZP5cnyTKbcR".trim(); // ← tu llave de wompi.co
+const WOMPI_INTEGRITY_SECRET = "prod_integrity_VBDyjlMtrZRMZMSG8r9L71yenBNo3zQ7".trim(); // ← del dashboard Wompi
 const WHATSAPP_ADMIN   = "573248298649"; // ← NÚMERO de WhatsApp del admin (sin +)
 
 const sb = supabase.createClient(SB_URL, SB_KEY);
@@ -608,7 +608,15 @@ function abrirWhatsAppAuto(direccion, nombre, pedidoId, total) {
 }
 
 async function generarFirmaIntegridad(referencia, montoCentavos, moneda, secretoIntegridad) {
-    const cadena = `${referencia}${montoCentavos}${moneda}${secretoIntegridad}`;
+    const cadena = `${referencia}${Math.round(montoCentavos)}${moneda}${secreto}`;
+    
+    // 👇 Agrega esto para ver qué cadena estás hasheando
+    console.log("Cadena para firma:", cadena);
+    console.log("Referencia:", referencia);
+    console.log("Monto centavos:", montoCentavos);
+    console.log("Moneda:", moneda);
+    console.log("Secreto (primeros 20 chars):", secretoIntegridad.substring(0, 20));
+    
     const encoder = new TextEncoder();
     const data = encoder.encode(cadena);
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
