@@ -5,6 +5,7 @@
 const SB_URL          = "https://mhnhfdtdpryrjaeaymsa.supabase.co";
 const SB_KEY          = "sb_publishable_tiKyjeMyir7LD0EmFCdo8g_CqAXoM8R";
 const WOMPI_PUBLIC_KEY = "pub_test_5eL1r2m92I05PsFi6Azw2ZP5cnyTKbcR"; // ← tu llave de wompi.co
+const WOMPI_INTEGRITY_SECRET = "prod_integrity_VBDyjlMtrZRMZMSG8r9L71yenBNo3zQ7"; // ← del dashboard Wompi
 const WHATSAPP_ADMIN   = "573248298649"; // ← NÚMERO de WhatsApp del admin (sin +)
 
 const sb = supabase.createClient(SB_URL, SB_KEY);
@@ -346,7 +347,7 @@ btnConfirmarPedido.addEventListener('click', async () => {
 
         // 3. Wompi: redirigir al checkout de pago
         if (metodo === 'wompi') {
-            redirigirWompi(pedidoData, total, nombre, currentUser.email, telefono);
+            await (pedidoData, total, nombre, currentUser.email, telefono);
             return;
         }
 
@@ -382,20 +383,24 @@ btnConfirmarPedido.addEventListener('click', async () => {
 // ================================================================
 // WOMPI — redirección al checkout
 // ================================================================
-function redirigirWompi(pedido, total, nombre, email, telefono) {
+async function redirigirWompi(pedido, total, nombre, email, telefono) {
     const montoCentavos = Math.round(total * 100);
     const referencia    = `PEDIDO-${pedido.id}-${Date.now()}`;
     const urlRetorno    = `${window.location.origin}${window.location.pathname}?pedido_id=${pedido.id}&referencia=${referencia}`;
 
+    // ✅ Generar firma de integridad
+    const firma = await generarFirmaIntegridad(referencia, montoCentavos, 'COP', WOMPI_INTEGRITY_SECRET);
+
     const wompiUrl = new URL('https://checkout.wompi.co/p/');
-    wompiUrl.searchParams.set('public-key',                    WOMPI_PUBLIC_KEY);
-    wompiUrl.searchParams.set('currency',                      'COP');
-    wompiUrl.searchParams.set('amount-in-cents',               montoCentavos);
-    wompiUrl.searchParams.set('reference',                     referencia);
-    wompiUrl.searchParams.set('redirect-url',                  urlRetorno);
-    wompiUrl.searchParams.set('customer-data:email',           email);
-    wompiUrl.searchParams.set('customer-data:full-name',       nombre);
-    wompiUrl.searchParams.set('customer-data:phone-number',    telefono);
+    wompiUrl.searchParams.set('public-key',                        WOMPI_PUBLIC_KEY);
+    wompiUrl.searchParams.set('currency',                          'COP');
+    wompiUrl.searchParams.set('amount-in-cents',                   montoCentavos);
+    wompiUrl.searchParams.set('reference',                         referencia);
+    wompiUrl.searchParams.set('signature:integrity',               firma);  // ✅ firma
+    wompiUrl.searchParams.set('redirect-url',                      urlRetorno);
+    wompiUrl.searchParams.set('customer-data:email',               email);
+    wompiUrl.searchParams.set('customer-data:full-name',           nombre);
+    wompiUrl.searchParams.set('customer-data:phone-number',        telefono);
     wompiUrl.searchParams.set('customer-data:phone-number-prefix', '+57');
 
     localStorage.setItem('wompi_pedido_id',  pedido.id);
@@ -600,6 +605,15 @@ function abrirWhatsAppAuto(direccion, nombre, pedidoId, total) {
             prompt('Copia este mensaje y envíalo por WhatsApp:', mensaje);
         }
     }
+}
+
+async function generarFirmaIntegridad(referencia, montoCentavos, moneda, secretoIntegridad) {
+    const cadena = `${referencia}${montoCentavos}${moneda}${secretoIntegridad}`;
+    const encoder = new TextEncoder();
+    const data = encoder.encode(cadena);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 // ================================================================
