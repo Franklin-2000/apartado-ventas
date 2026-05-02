@@ -608,7 +608,7 @@ function abrirWhatsAppAuto(direccion, nombre, pedidoId, total) {
 }
 
 async function generarFirmaIntegridad(referencia, montoCentavos, moneda, secretoIntegridad) {
-    const cadena = `${referencia}${Math.round(montoCentavos)}${moneda}${secreto}`;
+    const cadena = `${referencia}${Math.round(montoCentavos)}${moneda}${secretoIntegridad}`;
     
     // 👇 Agrega esto para ver qué cadena estás hasheando
     console.log("Cadena para firma:", cadena);
