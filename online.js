@@ -347,7 +347,7 @@ btnConfirmarPedido.addEventListener('click', async () => {
 
         // 3. Wompi: redirigir al checkout de pago
         if (metodo === 'wompi') {
-            await (pedidoData, total, nombre, currentUser.email, telefono);
+            await redirigirWompi(pedidoData, total, nombre, currentUser.email, telefono);
             return;
         }
 
