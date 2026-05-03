@@ -4,9 +4,9 @@
 // *** REEMPLAZA ESTOS VALORES ***
 const SB_URL          = "https://mhnhfdtdpryrjaeaymsa.supabase.co";
 const SB_KEY          = "sb_publishable_tiKyjeMyir7LD0EmFCdo8g_CqAXoM8R";
-const WOMPI_PUBLIC_KEY = "pub_test_5eL1r2m92I05PsFi6Azw2ZP5cnyTKbcR".trim(); // ← tu llave de wompi.co
-const WOMPI_INTEGRITY_SECRET = "test_integrity_qTioWDOwgynT8K9DSIHGkDCncyWHOiLz".trim(); // ← del dashboard Wompi
-const WHATSAPP_ADMIN   = "573248298649"; // ← NÚMERO de WhatsApp del admin (sin +)
+const WOMPI_PUBLIC_KEY = "prv_test_BtjEYzhymGXEGuIHXqtTkwK012YHRoVy"; // 
+const WOMPI_INTEGRITY_SECRET = "test_integrity_qTioWDOwgynT8K9DSIHGkDCncyWHOiLz"; 
+const WHATSAPP_ADMIN   = "573248298649"; 
 
 const sb = supabase.createClient(SB_URL, SB_KEY);
 
