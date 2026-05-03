@@ -6,6 +6,7 @@ const SB_URL          = "https://mhnhfdtdpryrjaeaymsa.supabase.co";
 const SB_KEY          = "sb_publishable_tiKyjeMyir7LD0EmFCdo8g_CqAXoM8R";
 const WOMPI_PUBLIC_KEY = "pub_test_5eL1r2m92I05PsFi6Azw2ZP5cnyTKbcR"; // 
 const WOMPI_INTEGRITY_SECRET = "test_integrity_qTioWDOwgynT8K9DSIHGkDCncyWHOiLz"; 
+const SUPABASE_FUNCTIONS_URL = 'https://mhnhfdtdpryrjaeaymsa.supabase.co/functions/v1';
 const WHATSAPP_ADMIN   = "573248298649"; 
 
 const sb = supabase.createClient(SB_URL, SB_KEY);
@@ -418,59 +419,31 @@ async function redirigirWompi(pedido, total, nombre, email, telefono) {
 // Esto dispara el trigger que descuenta el inventario automáticamente.
 // ================================================================
 async function verificarRetornoWompi() {
-    const params      = new URLSearchParams(window.location.search);
-    const pedidoId    = params.get('pedido_id');
-    const referencia  = params.get('referencia');
+    const params     = new URLSearchParams(window.location.search);
+    const pedidoId   = params.get('pedido_id');
+    const referencia = params.get('referencia');
 
     if (!pedidoId || !referencia) return;
-
-    // Limpiar la URL sin recargar
     window.history.replaceState({}, '', window.location.pathname);
 
     try {
-        // Consultar estado en la API de Wompi
-        // En producción usa: https://production.wompi.co/v1/transactions
-        // En pruebas usa:    https://sandbox.wompi.co/v1/transactions
-        const res  = await fetch(`https://sandbox.wompi.co/v1/transactions?reference=${referencia}`, {
-            headers: { 'Authorization': `Bearer ${WOMPI_PUBLIC_KEY}` }
+        const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/verificar-pago`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${SB_KEY}`
+            },
+            body: JSON.stringify({ pedidoId, referencia })
         });
         const json = await res.json();
-        const transacciones = json.data || [];
-        const aprobada = transacciones.find(t => t.status === 'APPROVED');
 
-        if (aprobada) {
-            // Pago aprobado → 'pago_confirmado'
-            // El trigger de Supabase descuenta el inventario al recibir este estado
-            const { error } = await sb
-                .from('pedidos')
-                .update({
-                    estado:               'pago_confirmado',
-                    wompi_transaction_id: aprobada.id
-                })
-                .eq('id', parseInt(pedidoId));
-
-            if (error) throw error;
-
+        if (json.aprobado) {
             carrito = [];
             actualizarCarritoUI();
             limpiarFormCheckout();
-            alert(
-                `✅ ¡Pago aprobado!\n` +
-                `Tu pedido #${pedidoId} fue confirmado y el inventario actualizado.\n` +
-                `Recibirás tu pedido pronto.`
-            );
+            alert(`✅ ¡Pago aprobado!\nTu pedido #${pedidoId} fue confirmado.`);
         } else {
-            // Pago fallido o pendiente
-            await sb
-                .from('pedidos')
-                .update({ estado: 'pago_fallido' })
-                .eq('id', parseInt(pedidoId));
-
-            alert(
-                `❌ El pago no pudo completarse.\n` +
-                `Tu pedido #${pedidoId} fue marcado como fallido.\n` +
-                `Puedes intentarlo de nuevo desde "Mis Pedidos".`
-            );
+            alert(`❌ El pago no pudo completarse.\nPuedes intentarlo de nuevo.`);
         }
     } catch (err) {
         console.error('Error verificando pago Wompi:', err);
