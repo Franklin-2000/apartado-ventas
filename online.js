@@ -4,6 +4,7 @@
 // *** REEMPLAZA ESTOS VALORES ***
 const SB_URL          = "https://mhnhfdtdpryrjaeaymsa.supabase.co";
 const SB_KEY          = "sb_publishable_tiKyjeMyir7LD0EmFCdo8g_CqAXoM8R";
+const ANON_KEY        = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1obmhmZHRkcHJ5cmphZWF5bXNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NDE3MjAsImV4cCI6MjA5MjExNzcyMH0.UINKafSUr0jI1_NGrh3Z-Uzhwi6Euqot3WQMsliteug";
 const WOMPI_PUBLIC_KEY = "pub_test_5eL1r2m92I05PsFi6Azw2ZP5cnyTKbcR"; // 
 const WOMPI_INTEGRITY_SECRET = "test_integrity_qTioWDOwgynT8K9DSIHGkDCncyWHOiLz"; 
 const SUPABASE_FUNCTIONS_URL = 'https://mhnhfdtdpryrjaeaymsa.supabase.co/functions/v1';
@@ -431,7 +432,7 @@ async function verificarRetornoWompi() {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${SB_KEY}`
+                'Authorization': `Bearer ${ANON_KEY}`
             },
             body: JSON.stringify({ pedidoId, referencia })
         });
