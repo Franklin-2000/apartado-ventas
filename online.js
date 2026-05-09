@@ -1,23 +1,32 @@
 // ================================================================
-// TIENDA ONLINE — scrip.js (versión definitiva)
+// TIENDA ONLINE — online.js
 // ================================================================
 // *** REEMPLAZA ESTOS VALORES ***
 const SB_URL          = "https://mhnhfdtdpryrjaeaymsa.supabase.co";
 const SB_KEY          = "sb_publishable_tiKyjeMyir7LD0EmFCdo8g_CqAXoM8R";
 const ANON_KEY        = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1obmhmZHRkcHJ5cmphZWF5bXNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NDE3MjAsImV4cCI6MjA5MjExNzcyMH0.UINKafSUr0jI1_NGrh3Z-Uzhwi6Euqot3WQMsliteug";
-const WOMPI_PUBLIC_KEY = "pub_test_5eL1r2m92I05PsFi6Azw2ZP5cnyTKbcR"; // 
-const WOMPI_INTEGRITY_SECRET = "test_integrity_qTioWDOwgynT8K9DSIHGkDCncyWHOiLz"; 
+const WOMPI_PUBLIC_KEY       = "pub_test_5eL1r2m92I05PsFi6Azw2ZP5cnyTKbcR";
+const WOMPI_INTEGRITY_SECRET = "test_integrity_qTioWDOwgynT8K9DSIHGkDCncyWHOiLz";
 const SUPABASE_FUNCTIONS_URL = 'https://mhnhfdtdpryrjaeaymsa.supabase.co/functions/v1';
-const WHATSAPP_ADMIN   = "573248298649"; 
+const WHATSAPP_ADMIN         = "573248298649";
+
+// ================================================================
+// *** EMAIL DEL ADMINISTRADOR (dueño de la tienda) ***
+// Solo sus productos aparecen en la tienda.
+// Solo él puede gestionar pedidos desde el panel admin.
+// ================================================================
+const ADMIN_EMAIL = "chindoyfranklin9@gmail.com";
 
 const sb = supabase.createClient(SB_URL, SB_KEY);
 
 // ================================================================
 // ESTADO GLOBAL
 // ================================================================
-let currentUser = null;
-let productos   = [];
-let carrito     = [];   // [{ producto, qty }]
+let currentUser  = null;
+let esAdmin      = false;
+let adminUserId  = null;   // user_id de la cuenta admin (se carga al iniciar)
+let productos    = [];
+let carrito      = [];     // [{ producto, qty }]
 
 // ================================================================
 // DOM
@@ -26,7 +35,7 @@ const pantLogin           = document.getElementById('pantalla-login');
 const pantTienda          = document.getElementById('pantalla-tienda');
 const btnGoogle           = document.getElementById('btnGoogle');
 const btnLogout           = document.getElementById('btnLogout');
-const productosGrid       = document.getElementById('tiendaContenido'); // nuevo contenedor
+const productosGrid       = document.getElementById('tiendaContenido');
 const loadingMsg          = document.getElementById('loadingMsg');
 const emptyMsg            = document.getElementById('emptyMsg');
 const inputBuscar         = document.getElementById('inputBuscar');
@@ -55,20 +64,63 @@ async function checkAuth() {
     const { data: { session } } = await sb.auth.getSession();
     if (session) {
         currentUser = session.user;
-        await mostrarTienda();
+        await iniciarSesion();
     } else {
         mostrarLogin();
     }
 }
 
+async function iniciarSesion() {
+    esAdmin = (currentUser.email === ADMIN_EMAIL);
+
+    // Cargamos el user_id del admin para filtrar productos
+    // (siempre lo necesitamos, sea admin o cliente)
+    if (esAdmin) {
+        adminUserId = currentUser.id;
+    } else {
+        // Buscar el user_id del admin mediante RPC o tabla pública no es posible
+        // directamente desde el cliente con RLS, así que usamos la función es_admin()
+        // Solo necesitamos el user_id para filtrar productos; lo obtenemos
+        // leyendo un producto de la tienda (cualquiera con user_id del admin)
+        // Alternativamente usamos la constante hardcoded en la query del SQL.
+        // La solución más limpia: agregar una columna "tienda_owner_email" en productos
+        // y filtrar por email, pero como ya tenemos ADMIN_EMAIL, lo pasamos como filtro
+        // desde el JS al SQL usando la función eq() después de traer el adminUserId.
+        // Estrategia: usar .eq('user_id', adminUserId) requiere conocer el uuid,
+        // lo cual no tenemos en el cliente fácilmente. 
+        // SOLUCIÓN: Añadimos una función RPC get_admin_user_id() en el SQL más abajo,
+        // o simplemente consultamos con el filtro de email usando una función.
+        // Por ahora lo resolvemos cargando el primer producto visible para obtener el user_id,
+        // pero la solución CORRECTA es la RPC get_admin_user_id() que incluimos en el SQL nuevo.
+        adminUserId = await obtenerAdminUserId();
+    }
+
+    await mostrarTienda();
+}
+
+// Obtiene el user_id del admin a través de la función RPC
+async function obtenerAdminUserId() {
+    const { data, error } = await sb.rpc('get_admin_user_id');
+    if (error || !data) {
+        console.error('No se pudo obtener admin user_id:', error);
+        return null;
+    }
+    return data;
+}
+
 function mostrarLogin() {
-    pantLogin.style.display = 'flex';
+    pantLogin.style.display  = 'flex';
     pantTienda.style.display = 'none';
 }
 
 async function mostrarTienda() {
-    pantLogin.style.display = 'none';
+    pantLogin.style.display  = 'none';
     pantTienda.style.display = 'block';
+
+    // Mostrar/ocultar botón "Panel Admin" según rol
+    const btnAdmin = document.getElementById('btnPanelAdmin');
+    if (btnAdmin) btnAdmin.style.display = esAdmin ? 'inline-flex' : 'none';
+
     await cargarProductos();
     verificarRetornoWompi();
 }
@@ -82,23 +134,32 @@ btnGoogle.addEventListener('click', async () => {
 
 btnLogout.addEventListener('click', async () => {
     await sb.auth.signOut();
-    carrito = [];
-    currentUser = null;
+    carrito      = [];
+    currentUser  = null;
+    esAdmin      = false;
+    adminUserId  = null;
     mostrarLogin();
 });
 
 // ================================================================
-// PRODUCTOS — carga desde Supabase
-// Solo muestra los que tienen stock > 0
+// PRODUCTOS — carga SOLO los del admin (dueño de la tienda)
 // ================================================================
 async function cargarProductos() {
     loadingMsg.style.display = 'block';
     productosGrid.innerHTML  = '';
     emptyMsg.style.display   = 'none';
 
+    if (!adminUserId) {
+        loadingMsg.style.display = 'none';
+        emptyMsg.style.display   = 'block';
+        emptyMsg.textContent     = 'No se pudo cargar el catálogo. Intenta de nuevo.';
+        return;
+    }
+
     const { data, error } = await sb
         .from('productos')
         .select('*')
+        .eq('user_id', adminUserId)   // ← FILTRO CLAVE: solo productos del admin
         .gt('cantidad', 0)
         .order('categoria', { ascending: true })
         .order('nombre',    { ascending: true });
@@ -106,8 +167,8 @@ async function cargarProductos() {
     loadingMsg.style.display = 'none';
 
     if (error) {
-        emptyMsg.style.display  = 'block';
-        emptyMsg.textContent    = 'Error al cargar productos. Intenta de nuevo.';
+        emptyMsg.style.display = 'block';
+        emptyMsg.textContent   = 'Error al cargar productos. Intenta de nuevo.';
         console.error(error);
         return;
     }
@@ -118,7 +179,7 @@ async function cargarProductos() {
     iniciarFiltrosCategorias();
 }
 
-// Etiquetas y emojis por categoría (igual que el proyecto madre)
+// Etiquetas y emojis por categoría
 const CATEGORIA_LABELS = {
     'Perecederos': '🥦 Perecederos',
     'Abarrotes':   '🛒 Abarrotes',
@@ -129,7 +190,6 @@ const CATEGORIA_LABELS = {
     'Otras':       '📦 Otras',
 };
 
-// Categorías en el orden deseado
 const ORDEN_CATEGORIAS = ['Perecederos','Abarrotes','Bebidas','Congelados','Hogar','Higiene','Otras'];
 
 function crearTarjetaProducto(p, idx) {
@@ -138,7 +198,7 @@ function crearTarjetaProducto(p, idx) {
     card.style.animationDelay = `${idx * 0.04}s`;
     card.dataset.id = p.id;
 
-    const agotado = p.cantidad === 0;
+    const agotado  = p.cantidad === 0;
     const catLabel = CATEGORIA_LABELS[p.categoria] || (p.categoria || '');
 
     card.innerHTML = `
@@ -166,12 +226,11 @@ function crearTarjetaProducto(p, idx) {
     `;
 
     if (!agotado) {
-        const inputQty = card.querySelector('.input-qty-card');
-        const btnBajar = card.querySelector('.btn-qty-bajar');
-        const btnSubir = card.querySelector('.btn-qty-subir');
+        const inputQty   = card.querySelector('.input-qty-card');
+        const btnBajar   = card.querySelector('.btn-qty-bajar');
+        const btnSubir   = card.querySelector('.btn-qty-subir');
         const btnAgregar = card.querySelector('.btn-agregar');
 
-        // Flechas
         btnSubir.addEventListener('click', () => {
             let v = parseInt(inputQty.value) || 1;
             if (v < p.cantidad) inputQty.value = v + 1;
@@ -180,22 +239,18 @@ function crearTarjetaProducto(p, idx) {
             let v = parseInt(inputQty.value) || 1;
             if (v > 1) inputQty.value = v - 1;
         });
-
-        // Validar escritura manual — siempre >= 1 y <= stock
         inputQty.addEventListener('input', () => {
             let v = parseInt(inputQty.value);
-            if (isNaN(v) || v < 1) inputQty.value = 1;
-            else if (v > p.cantidad) inputQty.value = p.cantidad;
+            if (isNaN(v) || v < 1)        inputQty.value = 1;
+            else if (v > p.cantidad)       inputQty.value = p.cantidad;
         });
         inputQty.addEventListener('blur', () => {
             if (!inputQty.value || parseInt(inputQty.value) < 1) inputQty.value = 1;
         });
-
-        // Agregar al carrito
         btnAgregar.addEventListener('click', () => {
             const qty = parseInt(inputQty.value) || 1;
             agregarAlCarritoConQty(p, qty);
-            inputQty.value = 1; // reset
+            inputQty.value = 1;
         });
     }
 
@@ -207,7 +262,6 @@ function renderProductos(lista) {
     emptyMsg.style.display  = lista.length === 0 ? 'block' : 'none';
     if (lista.length === 0) return;
 
-    // Agrupar por categoría manteniendo el orden definido
     const grupos = {};
     lista.forEach(p => {
         const cat = p.categoria || 'Otras';
@@ -215,8 +269,7 @@ function renderProductos(lista) {
         grupos[cat].push(p);
     });
 
-    // Renderizar en el orden de ORDEN_CATEGORIAS; luego el resto
-    const catsEnUso = Object.keys(grupos);
+    const catsEnUso  = Object.keys(grupos);
     const ordenFinal = [
         ...ORDEN_CATEGORIAS.filter(c => catsEnUso.includes(c)),
         ...catsEnUso.filter(c => !ORDEN_CATEGORIAS.includes(c))
@@ -224,57 +277,46 @@ function renderProductos(lista) {
 
     let idxGlobal = 0;
     ordenFinal.forEach(cat => {
-        const prods = grupos[cat];
+        const prods   = grupos[cat];
         const seccion = document.createElement('div');
-        seccion.className = 'categoria-seccion';
+        seccion.className  = 'categoria-seccion';
         seccion.dataset.cat = cat;
 
         const titulo = document.createElement('h2');
-        titulo.className = 'categoria-titulo';
+        titulo.className   = 'categoria-titulo';
         titulo.textContent = CATEGORIA_LABELS[cat] || cat;
         seccion.appendChild(titulo);
 
         const grid = document.createElement('div');
         grid.className = 'categoria-grid';
-
-        prods.forEach(p => {
-            grid.appendChild(crearTarjetaProducto(p, idxGlobal++));
-        });
+        prods.forEach(p => grid.appendChild(crearTarjetaProducto(p, idxGlobal++)));
 
         seccion.appendChild(grid);
         productosGrid.appendChild(seccion);
     });
 }
 
-// Iniciar botones de filtro por categoría
 function iniciarFiltrosCategorias() {
     const btns = document.querySelectorAll('.btn-categoria');
     btns.forEach(btn => {
         btn.addEventListener('click', () => {
             btns.forEach(b => b.classList.remove('activa'));
             btn.classList.add('activa');
-            const cat = btn.dataset.cat;
-            filtrarPorCategoria(cat);
+            filtrarPorCategoria(btn.dataset.cat);
         });
     });
 }
 
 function filtrarPorCategoria(cat) {
-    if (cat === 'todas') {
-        renderProductos(productos);
-        return;
-    }
+    if (cat === 'todas') { renderProductos(productos); return; }
     renderProductos(productos.filter(p => (p.categoria || 'Otras') === cat));
 }
 
-// Búsqueda en tiempo real
 inputBuscar.addEventListener('input', () => {
     const term = inputBuscar.value.trim().toLowerCase();
-    // Resetear filtro de categorías visualmente
     document.querySelectorAll('.btn-categoria').forEach(b => b.classList.remove('activa'));
     const btnTodas = document.querySelector('.btn-categoria[data-cat="todas"]');
     if (btnTodas) btnTodas.classList.add('activa');
-
     if (!term) { renderProductos(productos); return; }
     renderProductos(productos.filter(p =>
         p.nombre.toLowerCase().includes(term) ||
@@ -285,12 +327,8 @@ inputBuscar.addEventListener('input', () => {
 // ================================================================
 // CARRITO
 // ================================================================
-// Versión clásica (agrega 1 unidad — usada internamente)
-function agregarAlCarrito(producto) {
-    agregarAlCarritoConQty(producto, 1);
-}
+function agregarAlCarrito(producto) { agregarAlCarritoConQty(producto, 1); }
 
-// Versión con cantidad personalizada — usada por las tarjetas
 function agregarAlCarritoConQty(producto, qty) {
     qty = parseInt(qty) || 1;
     if (qty < 1) qty = 1;
@@ -304,11 +342,9 @@ function agregarAlCarritoConQty(producto, qty) {
         return;
     }
 
-    // Limitar al stock disponible
     const qtyReal = Math.min(qty, stockDisponible - enCarrito);
-
-    if (existente) { existente.qty += qtyReal; }
-    else           { carrito.push({ producto, qty: qtyReal }); }
+    if (existente) existente.qty += qtyReal;
+    else           carrito.push({ producto, qty: qtyReal });
 
     actualizarCarritoUI();
     abrirCarrito();
@@ -390,7 +426,7 @@ btnCerrarCarrito.addEventListener('click', cerrarCarrito);
 carritoOverlay.addEventListener('click', cerrarCarrito);
 
 // ================================================================
-// CHECKOUT — resumen y formulario
+// CHECKOUT
 // ================================================================
 btnCheckout.addEventListener('click', () => {
     if (carrito.length === 0) { alert('Tu carrito está vacío.'); return; }
@@ -407,11 +443,13 @@ function abrirModalCheckout() {
         </div>
     `).join('');
     checkoutTotalFinal.textContent = total.toLocaleString('es-CO');
-    modalCheckout.style.display   = 'flex';
+    modalCheckout.style.display    = 'flex';
 }
 
-btnCerrarCheckout.addEventListener('click',  () => { modalCheckout.style.display = 'none'; });
-modalCheckout.addEventListener('click', e => { if (e.target === modalCheckout) modalCheckout.style.display = 'none'; });
+btnCerrarCheckout.addEventListener('click', () => { modalCheckout.style.display = 'none'; });
+modalCheckout.addEventListener('click', e => {
+    if (e.target === modalCheckout) modalCheckout.style.display = 'none';
+});
 
 function limpiarFormCheckout() {
     document.getElementById('chkNombre').value    = '';
@@ -423,9 +461,6 @@ function limpiarFormCheckout() {
 
 // ================================================================
 // CONFIRMAR PEDIDO
-// El pedido se guarda en estado 'pendiente' o 'esperando_pago'.
-// El inventario NO se toca aquí — lo hace el trigger en Supabase
-// cuando el admin confirma el pago.
 // ================================================================
 btnConfirmarPedido.addEventListener('click', async () => {
     const nombre    = document.getElementById('chkNombre').value.trim();
@@ -445,10 +480,6 @@ btnConfirmarPedido.addEventListener('click', async () => {
     btnConfirmarPedido.textContent = 'Procesando...';
 
     try {
-        // 1. Crear el pedido en Supabase
-        //    Estado inicial según método de pago:
-        //    - contraentrega → 'pendiente'    (admin confirma manualmente)
-        //    - wompi         → 'esperando_pago' (se actualiza cuando Wompi confirma)
         const estadoInicial = metodo === 'contraentrega' ? 'pendiente' : 'esperando_pago';
 
         const { data: pedidoData, error: pedidoError } = await sb
@@ -470,7 +501,6 @@ btnConfirmarPedido.addEventListener('click', async () => {
 
         if (pedidoError) throw pedidoError;
 
-        // 2. Guardar los items del pedido
         const items = carrito.map(i => ({
             pedido_id:  pedidoData.id,
             product_id: i.producto.id,
@@ -483,31 +513,21 @@ btnConfirmarPedido.addEventListener('click', async () => {
         const { error: itemsError } = await sb.from('items_pedido').insert(items);
         if (itemsError) throw itemsError;
 
-        // 3. Wompi: redirigir al checkout de pago
         if (metodo === 'wompi') {
             await redirigirWompi(pedidoData, total, nombre, currentUser.email, telefono);
             return;
         }
 
-        // 4. Contra entrega: confirmar al usuario
-        //    El inventario NO se descuenta todavía — lo hace el admin al confirmar
         carrito = [];
         actualizarCarritoUI();
         modalCheckout.style.display = 'none';
         limpiarFormCheckout();
-        
-        const mensajeConfirmacion = `✅ ¡Pedido #${pedidoData.id} recibido!\n\n` +
-            `Te contactaremos para coordinar la entrega.\n` +
-            `El pago se realizará al momento de la entrega.`;
-        
-        alert(mensajeConfirmacion);
-        
-        // Redirigir automáticamente a WhatsApp para chatear con el vendedor
-        if (metodo === 'contraentrega') {
-            setTimeout(() => {
-                abrirWhatsAppAuto(direccion, nombre, pedidoData.id, total);
-            }, 1000);
-        }
+
+        alert(`✅ ¡Pedido #${pedidoData.id} recibido!\n\nTe contactaremos para coordinar la entrega.\nEl pago se realizará al momento de la entrega.`);
+
+        setTimeout(() => {
+            abrirWhatsAppAuto(direccion, nombre, pedidoData.id, total);
+        }, 1000);
 
     } catch (err) {
         console.error('Error al confirmar pedido:', err);
@@ -519,22 +539,20 @@ btnConfirmarPedido.addEventListener('click', async () => {
 });
 
 // ================================================================
-// WOMPI — redirección al checkout
+// WOMPI
 // ================================================================
 async function redirigirWompi(pedido, total, nombre, email, telefono) {
     const montoCentavos = Math.round(total * 100);
     const referencia    = `PEDIDO-${pedido.id}-${Date.now()}`;
     const urlRetorno    = `${window.location.origin}${window.location.pathname}?pedido_id=${pedido.id}&referencia=${referencia}`;
-
-    // ✅ Generar firma de integridad
-    const firma = await generarFirmaIntegridad(referencia, montoCentavos, 'COP', WOMPI_INTEGRITY_SECRET);
+    const firma         = await generarFirmaIntegridad(referencia, montoCentavos, 'COP', WOMPI_INTEGRITY_SECRET);
 
     const wompiUrl = new URL('https://checkout.wompi.co/p/');
     wompiUrl.searchParams.set('public-key',                        WOMPI_PUBLIC_KEY);
     wompiUrl.searchParams.set('currency',                          'COP');
     wompiUrl.searchParams.set('amount-in-cents',                   montoCentavos);
     wompiUrl.searchParams.set('reference',                         referencia);
-    wompiUrl.searchParams.set('signature:integrity',               firma);  // ✅ firma
+    wompiUrl.searchParams.set('signature:integrity',               firma);
     wompiUrl.searchParams.set('redirect-url',                      urlRetorno);
     wompiUrl.searchParams.set('customer-data:email',               email);
     wompiUrl.searchParams.set('customer-data:full-name',           nombre);
@@ -547,14 +565,6 @@ async function redirigirWompi(pedido, total, nombre, email, telefono) {
     window.location.href = wompiUrl.toString();
 }
 
-// ================================================================
-// WOMPI — retorno después del pago
-// Cuando Wompi redirige de vuelta a la tienda, verificamos el
-// estado de la transacción y actualizamos el pedido.
-//
-// Si el pago fue APROBADO → estado 'pago_confirmado'
-// Esto dispara el trigger que descuenta el inventario automáticamente.
-// ================================================================
 async function verificarRetornoWompi() {
     const params     = new URLSearchParams(window.location.search);
     const pedidoId   = params.get('pedido_id');
@@ -566,7 +576,7 @@ async function verificarRetornoWompi() {
     try {
         const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/verificar-pago`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${ANON_KEY}`
             },
@@ -588,11 +598,11 @@ async function verificarRetornoWompi() {
 }
 
 // ================================================================
-// MIS PEDIDOS — el cliente ve el estado de sus pedidos
+// MIS PEDIDOS — el cliente ve sus propios pedidos
 // ================================================================
 btnMisPedidos.addEventListener('click', async () => {
-    modalMisPedidos.style.display  = 'flex';
-    listaMisPedidos.innerHTML      = '<p>Cargando...</p>';
+    modalMisPedidos.style.display = 'flex';
+    listaMisPedidos.innerHTML     = '<p>Cargando...</p>';
     await cargarMisPedidos();
 });
 
@@ -621,13 +631,13 @@ async function cargarMisPedidos() {
     listaMisPedidos.innerHTML = '';
 
     const etiquetaEstado = {
-        pendiente:       { texto: 'Pendiente — contra entrega',    clase: 'estado-pendiente'  },
-        esperando_pago:  { texto: 'Esperando pago online',         clase: 'estado-pendiente'  },
-        pago_confirmado: { texto: '✅ Pago confirmado',            clase: 'estado-pagado'     },
-        despachado:      { texto: '🚚 En camino',                  clase: 'estado-despachado' },
-        entregado:       { texto: '📦 Entregado',                  clase: 'estado-entregado'  },
-        pago_fallido:    { texto: '❌ Pago fallido',               clase: 'estado-cancelado'  },
-        cancelado:       { texto: '🚫 Cancelado',                  clase: 'estado-cancelado'  },
+        pendiente:       { texto: 'Pendiente — contra entrega', clase: 'estado-pendiente'  },
+        esperando_pago:  { texto: 'Esperando pago online',      clase: 'estado-pendiente'  },
+        pago_confirmado: { texto: '✅ Pago confirmado',         clase: 'estado-pagado'     },
+        despachado:      { texto: '🚚 En camino',               clase: 'estado-despachado' },
+        entregado:       { texto: '📦 Entregado',               clase: 'estado-entregado'  },
+        pago_fallido:    { texto: '❌ Pago fallido',            clase: 'estado-cancelado'  },
+        cancelado:       { texto: '🚫 Cancelado',               clase: 'estado-cancelado'  },
     };
 
     data.forEach(pedido => {
@@ -648,10 +658,7 @@ async function cargarMisPedidos() {
             <div class="pedido-card-body">
                 <ul>
                     ${pedido.items_pedido.map(i =>
-                        `<li>
-                            <span>${i.cantidad}x ${i.nombre}</span>
-                            <span>$${Number(i.subtotal).toLocaleString('es-CO')}</span>
-                        </li>`
+                        `<li><span>${i.cantidad}x ${i.nombre}</span><span>$${Number(i.subtotal).toLocaleString('es-CO')}</span></li>`
                     ).join('')}
                 </ul>
                 <div class="pedido-info-extra">
@@ -672,45 +679,23 @@ async function cargarMisPedidos() {
 }
 
 // ================================================================
-// WHATSAPP AUTO —-redirige automáticamente después del pedido
+// WHATSAPP AUTO
 // ================================================================
-
-/**
- * Abre WhatsApp automáticamente después de confirmar pedido
- * @param {string} direccion - Dirección de entrega
- * @param {string} nombre - Nombre del cliente
- * @param {number} pedidoId - ID del pedido
- * @param {number} total - Total del pedido
- */
 function abrirWhatsAppAuto(direccion, nombre, pedidoId, total) {
-    // Crear mensaje con los detalles del pedido
     const mensaje = `📦 *Nuevo Pedido #${pedidoId}*\n\n` +
         `👤 *Cliente:* ${nombre}\n` +
         `💰 *Total:* $${Number(total).toLocaleString('es-CO')}\n` +
         `📍 *Dirección:* ${direccion}\n\n` +
         `Hola, acabo de hacer un pedido y me gustaría coordinar la entrega.`;
-    
-    const mensajeEncoded = encodeURIComponent(mensaje);
-    const urlWhatsApp = `https://wa.me/${WHATSAPP_ADMIN}?text=${mensajeEncoded}`;
-    
-    console.log('Abriendo WhatsApp automáticamente:', urlWhatsApp);
-    
-    // Intentar abrir WhatsApp
-    const ventana = window.open(urlWhatsApp, '_blank');
-    
-    // Verificar si se abrió correctamente
+
+    const ventana = window.open(`https://wa.me/${WHATSAPP_ADMIN}?text=${encodeURIComponent(mensaje)}`, '_blank');
+
     if (!ventana || ventana.closed || typeof ventana.closed === 'undefined') {
-        // Popup bloqueado - copiar al portapapeles
-        console.log('Popup bloqueado - copiando al portapapeles');
-        
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(mensaje).then(() => {
-                alert('📱 Se copió el mensaje al portapapeles.\n\n' +
-                      'Abre WhatsApp y pega el mensaje para chatear con el vendedor.');
+                alert('📱 Se copió el mensaje al portapapeles.\n\nAbre WhatsApp y pega el mensaje para chatear con el vendedor.');
                 window.open('https://web.whatsapp.com', '_blank');
-            }).catch(() => {
-                prompt('Copia este mensaje y envíalo por WhatsApp:', mensaje);
-            });
+            }).catch(() => { prompt('Copia este mensaje y envíalo por WhatsApp:', mensaje); });
         } else {
             prompt('Copia este mensaje y envíalo por WhatsApp:', mensaje);
         }
@@ -718,26 +703,282 @@ function abrirWhatsAppAuto(direccion, nombre, pedidoId, total) {
 }
 
 async function generarFirmaIntegridad(referencia, montoCentavos, moneda, secretoIntegridad) {
-    const cadena = `${referencia}${Math.round(montoCentavos)}${moneda}${secretoIntegridad}`;
-    
-    const encoder = new TextEncoder();
-    const data = encoder.encode(cadena);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    const cadena     = `${referencia}${Math.round(montoCentavos)}${moneda}${secretoIntegridad}`;
+    const encoder    = new TextEncoder();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(cadena));
+    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ================================================================
+// ╔══════════════════════════════════════════════════════════════╗
+// ║               PANEL ADMINISTRADOR DE PEDIDOS                ║
+// ║  Solo visible para el admin. Permite confirmar pagos,       ║
+// ║  marcar como despachado y entregado.                        ║
+// ╚══════════════════════════════════════════════════════════════╝
+// ================================================================
+
+const ESTADOS_ADMIN = {
+    pendiente:       { label: 'Pendiente',        clase: 'estado-pendiente',  acciones: ['pago_confirmado', 'cancelado'] },
+    esperando_pago:  { label: 'Esperando pago',   clase: 'estado-pendiente',  acciones: ['pago_confirmado', 'pago_fallido', 'cancelado'] },
+    pago_confirmado: { label: '✅ Pago confirmado',clase: 'estado-pagado',    acciones: ['despachado'] },
+    despachado:      { label: '🚚 Despachado',     clase: 'estado-despachado', acciones: ['entregado'] },
+    entregado:       { label: '📦 Entregado',      clase: 'estado-entregado',  acciones: [] },
+    pago_fallido:    { label: '❌ Pago fallido',   clase: 'estado-cancelado',  acciones: ['cancelado'] },
+    cancelado:       { label: '🚫 Cancelado',      clase: 'estado-cancelado',  acciones: [] },
+};
+
+const ACCION_LABELS = {
+    pago_confirmado: '✅ Confirmar pago',
+    despachado:      '🚚 Marcar despachado',
+    entregado:       '📦 Marcar entregado',
+    pago_fallido:    '❌ Marcar pago fallido',
+    cancelado:       '🚫 Cancelar pedido',
+};
+
+// Inyectar el modal del panel admin en el DOM
+function inyectarPanelAdmin() {
+    if (document.getElementById('modalPanelAdmin')) return;
+
+    const html = `
+    <!-- BOTÓN PANEL ADMIN en el header (se muestra solo si es admin) -->
+
+    <!-- MODAL PANEL ADMIN -->
+    <div class="modal-overlay" id="modalPanelAdmin" style="display:none;">
+        <div class="modal-box modal-box-admin">
+            <button class="modal-cerrar" id="btnCerrarPanelAdmin">✕</button>
+            <h2>🛠️ Panel de Pedidos</h2>
+
+            <!-- Filtros de estado -->
+            <div class="admin-filtros">
+                <button class="btn-filtro-admin activo" data-estado="todos">Todos</button>
+                <button class="btn-filtro-admin" data-estado="pendiente">Pendientes</button>
+                <button class="btn-filtro-admin" data-estado="esperando_pago">Esperando pago</button>
+                <button class="btn-filtro-admin" data-estado="pago_confirmado">Confirmados</button>
+                <button class="btn-filtro-admin" data-estado="despachado">Despachados</button>
+                <button class="btn-filtro-admin" data-estado="entregado">Entregados</button>
+                <button class="btn-filtro-admin" data-estado="cancelado">Cancelados</button>
+            </div>
+
+            <div id="adminListaPedidos" class="admin-lista-pedidos">
+                <p>Cargando pedidos...</p>
+            </div>
+        </div>
+    </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', html);
+
+    // Evento cerrar
+    document.getElementById('btnCerrarPanelAdmin').addEventListener('click', () => {
+        document.getElementById('modalPanelAdmin').style.display = 'none';
+    });
+    document.getElementById('modalPanelAdmin').addEventListener('click', e => {
+        if (e.target === document.getElementById('modalPanelAdmin'))
+            document.getElementById('modalPanelAdmin').style.display = 'none';
+    });
+
+    // Filtros
+    document.querySelectorAll('.btn-filtro-admin').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.btn-filtro-admin').forEach(b => b.classList.remove('activo'));
+            btn.classList.add('activo');
+            filtrarPedidosAdmin(btn.dataset.estado);
+        });
+    });
+}
+
+// Variable global con todos los pedidos del admin
+let pedidosAdmin = [];
+
+async function abrirPanelAdmin() {
+    document.getElementById('modalPanelAdmin').style.display = 'flex';
+    document.getElementById('adminListaPedidos').innerHTML   = '<p class="admin-cargando">Cargando pedidos...</p>';
+    await cargarPedidosAdmin();
+}
+
+async function cargarPedidosAdmin() {
+    const { data, error } = await sb
+        .from('pedidos')
+        .select(`
+            id, estado, total, metodo_pago, fecha,
+            cliente_nombre, cliente_email, cliente_tel,
+            direccion, notas, fecha_confirmacion,
+            items_pedido (nombre, cantidad, precio, subtotal)
+        `)
+        .order('id', { ascending: false });
+
+    if (error) {
+        document.getElementById('adminListaPedidos').innerHTML =
+            `<p style="color:red; padding:20px;">Error al cargar pedidos: ${error.message}</p>`;
+        return;
+    }
+
+    pedidosAdmin = data || [];
+    filtrarPedidosAdmin('todos');
+}
+
+function filtrarPedidosAdmin(estado) {
+    const lista = estado === 'todos'
+        ? pedidosAdmin
+        : pedidosAdmin.filter(p => p.estado === estado);
+    renderPedidosAdmin(lista);
+}
+
+function renderPedidosAdmin(lista) {
+    const contenedor = document.getElementById('adminListaPedidos');
+
+    if (lista.length === 0) {
+        contenedor.innerHTML = '<p class="admin-vacio">No hay pedidos en este estado.</p>';
+        return;
+    }
+
+    contenedor.innerHTML = '';
+
+    lista.forEach(pedido => {
+        const estadoInfo = ESTADOS_ADMIN[pedido.estado] || { label: pedido.estado, clase: '', acciones: [] };
+        const fecha      = new Date(pedido.fecha).toLocaleString('es-CO');
+
+        const card = document.createElement('div');
+        card.className       = 'admin-pedido-card';
+        card.dataset.pedidoId = pedido.id;
+
+        const botonesAccion = estadoInfo.acciones.map(accion => `
+            <button class="btn-accion-admin btn-accion-${accion}"
+                    data-pedido="${pedido.id}"
+                    data-accion="${accion}">
+                ${ACCION_LABELS[accion] || accion}
+            </button>
+        `).join('');
+
+        card.innerHTML = `
+            <div class="admin-pedido-header" data-toggle="${pedido.id}">
+                <div class="admin-pedido-id-fecha">
+                    <span class="admin-pedido-num">Pedido #${pedido.id}</span>
+                    <span class="admin-pedido-fecha">${fecha}</span>
+                </div>
+                <span class="pedido-estado ${estadoInfo.clase}">${estadoInfo.label}</span>
+                <span class="admin-pedido-total">$${Number(pedido.total).toLocaleString('es-CO')}</span>
+                <span class="admin-toggle-icon">▼</span>
+            </div>
+            <div class="admin-pedido-body" id="admin-body-${pedido.id}" style="display:none;">
+                <div class="admin-cliente-info">
+                    <strong>👤 ${pedido.cliente_nombre}</strong>
+                    <span>📧 ${pedido.cliente_email}</span>
+                    <span>📞 ${pedido.cliente_tel}</span>
+                    <span>📍 ${pedido.direccion}</span>
+                    <span>💳 ${pedido.metodo_pago === 'contraentrega' ? 'Contra entrega' : 'Online (Wompi)'}</span>
+                    ${pedido.notas ? `<span>📝 ${pedido.notas}</span>` : ''}
+                </div>
+                <div class="admin-items-lista">
+                    <table class="admin-tabla-items">
+                        <thead>
+                            <tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr>
+                        </thead>
+                        <tbody>
+                            ${pedido.items_pedido.map(i => `
+                                <tr>
+                                    <td>${i.nombre}</td>
+                                    <td>${i.cantidad}</td>
+                                    <td>$${Number(i.precio).toLocaleString('es-CO')}</td>
+                                    <td>$${Number(i.subtotal).toLocaleString('es-CO')}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="3"><strong>Total</strong></td>
+                                <td><strong>$${Number(pedido.total).toLocaleString('es-CO')}</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                ${botonesAccion ? `<div class="admin-acciones">${botonesAccion}</div>` : ''}
+            </div>
+        `;
+
+        // Toggle expandir/colapsar
+        card.querySelector(`[data-toggle="${pedido.id}"]`).addEventListener('click', () => {
+            const body = document.getElementById(`admin-body-${pedido.id}`);
+            const icon = card.querySelector('.admin-toggle-icon');
+            const abierto = body.style.display === 'block';
+            body.style.display = abierto ? 'none' : 'block';
+            icon.textContent   = abierto ? '▼' : '▲';
+        });
+
+        // Botones de acción
+        card.querySelectorAll('.btn-accion-admin').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const pedidoId  = parseInt(btn.dataset.pedido);
+                const nuevaAccion = btn.dataset.accion;
+                await cambiarEstadoPedido(pedidoId, nuevaAccion, btn);
+            });
+        });
+
+        contenedor.appendChild(card);
+    });
+}
+
+async function cambiarEstadoPedido(pedidoId, nuevoEstado, btnEl) {
+    const confirmMsg = {
+        pago_confirmado: `¿Confirmar el pago del pedido #${pedidoId}?\n\nEsto descontará el inventario automáticamente.`,
+        despachado:      `¿Marcar el pedido #${pedidoId} como despachado?`,
+        entregado:       `¿Marcar el pedido #${pedidoId} como entregado?`,
+        pago_fallido:    `¿Marcar el pago del pedido #${pedidoId} como fallido?`,
+        cancelado:       `¿Cancelar el pedido #${pedidoId}?`,
+    };
+
+    if (!confirm(confirmMsg[nuevoEstado] || `¿Cambiar estado a "${nuevoEstado}"?`)) return;
+
+    const textoOriginal  = btnEl.textContent;
+    btnEl.disabled       = true;
+    btnEl.textContent    = 'Procesando...';
+
+    try {
+        const { error } = await sb.rpc('cambiar_estado_pedido', {
+            p_pedido_id:    pedidoId,
+            p_nuevo_estado: nuevoEstado
+        });
+
+        if (error) throw error;
+
+        alert(`✅ Pedido #${pedidoId} actualizado a: ${ACCION_LABELS[nuevoEstado] || nuevoEstado}`);
+
+        // Recargar la lista
+        await cargarPedidosAdmin();
+
+        // Mantener el filtro activo
+        const filtroActivo = document.querySelector('.btn-filtro-admin.activo');
+        if (filtroActivo) filtrarPedidosAdmin(filtroActivo.dataset.estado);
+
+    } catch (err) {
+        console.error('Error al cambiar estado:', err);
+        alert(`❌ Error: ${err.message || 'No se pudo cambiar el estado. Verifica el stock si estás confirmando el pago.'}`);
+        btnEl.disabled    = false;
+        btnEl.textContent = textoOriginal;
+    }
 }
 
 // ================================================================
 // INIT
 // ================================================================
 document.addEventListener('DOMContentLoaded', () => {
+    // Inyectar panel admin en el DOM antes de checkAuth
+    inyectarPanelAdmin();
+
+    // Enlazar botón "Panel Admin" del header (definido en index.html)
+    const btnAdmin = document.getElementById('btnPanelAdmin');
+    if (btnAdmin) {
+        btnAdmin.style.display = 'none'; // oculto hasta verificar si es admin
+        btnAdmin.addEventListener('click', abrirPanelAdmin);
+    }
+
     checkAuth();
 
-    // Escucha cambios de sesión (ej: cuando Google redirige de vuelta)
     sb.auth.onAuthStateChange((_event, session) => {
         if (session && !currentUser) {
             currentUser = session.user;
-            mostrarTienda();
+            iniciarSesion();
         }
     });
 });
