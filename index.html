@@ -16,7 +16,7 @@
   <div id="pantalla-login">
     <div class="login-box">
       <h1 class="logo-titulo">Mi Tienda</h1>
-      <p class="login-sub">Inicia sesión para comprar</p>
+      <p class="login-sub">¡Bienvenido! Inicia sesión para comprar</p>
       <button id="btnGoogle" class="btn-google">
         <svg viewBox="0 0 48 48" width="22" height="22">
           <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -49,9 +49,21 @@
       <input type="text" id="inputBuscar" placeholder="🔍  Buscar producto..." class="input-buscar">
     </div>
 
-    <!-- Grid de productos -->
-    <main class="productos-grid" id="productosGrid">
-      <!-- Se llena dinámicamente -->
+    <!-- Filtros de categoría -->
+    <div class="categorias-filtro" id="categoriasFiltro">
+      <button class="btn-categoria activa" data-cat="todas">🏪 Todas</button>
+      <button class="btn-categoria" data-cat="Perecederos">🥦 Perecederos</button>
+      <button class="btn-categoria" data-cat="Abarrotes">🛒 Abarrotes</button>
+      <button class="btn-categoria" data-cat="Bebidas">🥤 Bebidas</button>
+      <button class="btn-categoria" data-cat="Congelados">🧊 Congelados</button>
+      <button class="btn-categoria" data-cat="Hogar">🧹 Hogar</button>
+      <button class="btn-categoria" data-cat="Higiene">🧴 Higiene</button>
+      <button class="btn-categoria" data-cat="Otras">📦 Otras</button>
+    </div>
+
+    <!-- Contenedor por categorías -->
+    <main class="tienda-contenido" id="tiendaContenido">
+      <!-- Se llena dinámicamente con secciones por categoría -->
     </main>
 
     <div class="loading-msg" id="loadingMsg">Cargando productos...</div>
@@ -105,9 +117,9 @@
             <span>💵 Contra entrega</span>
           </label>
           <label class="metodo-opcion">
-              <input type="radio" name="metodoPago" value="wompi">
-              <span>💳 Pagar online (Wompi)</span>
-            </label>
+            <input type="radio" name="metodoPago" value="wompi">
+            <span>💳 Pagar online (Wompi)</span>
+          </label>
         </div>
       </div>
 

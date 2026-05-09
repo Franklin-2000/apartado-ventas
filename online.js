@@ -26,7 +26,7 @@ const pantLogin           = document.getElementById('pantalla-login');
 const pantTienda          = document.getElementById('pantalla-tienda');
 const btnGoogle           = document.getElementById('btnGoogle');
 const btnLogout           = document.getElementById('btnLogout');
-const productosGrid       = document.getElementById('productosGrid');
+const productosGrid       = document.getElementById('tiendaContenido'); // nuevo contenedor
 const loadingMsg          = document.getElementById('loadingMsg');
 const emptyMsg            = document.getElementById('emptyMsg');
 const inputBuscar         = document.getElementById('inputBuscar');
@@ -100,7 +100,8 @@ async function cargarProductos() {
         .from('productos')
         .select('*')
         .gt('cantidad', 0)
-        .order('nombre', { ascending: true });
+        .order('categoria', { ascending: true })
+        .order('nombre',    { ascending: true });
 
     loadingMsg.style.display = 'none';
 
@@ -114,43 +115,166 @@ async function cargarProductos() {
     productos = data || [];
     if (productos.length === 0) { emptyMsg.style.display = 'block'; return; }
     renderProductos(productos);
+    iniciarFiltrosCategorias();
+}
+
+// Etiquetas y emojis por categoría (igual que el proyecto madre)
+const CATEGORIA_LABELS = {
+    'Perecederos': '🥦 Perecederos',
+    'Abarrotes':   '🛒 Abarrotes',
+    'Bebidas':     '🥤 Bebidas',
+    'Congelados':  '🧊 Congelados',
+    'Hogar':       '🧹 Hogar',
+    'Higiene':     '🧴 Higiene',
+    'Otras':       '📦 Otras',
+};
+
+// Categorías en el orden deseado
+const ORDEN_CATEGORIAS = ['Perecederos','Abarrotes','Bebidas','Congelados','Hogar','Higiene','Otras'];
+
+function crearTarjetaProducto(p, idx) {
+    const card = document.createElement('div');
+    card.className = 'tarjeta-tienda';
+    card.style.animationDelay = `${idx * 0.04}s`;
+    card.dataset.id = p.id;
+
+    const agotado = p.cantidad === 0;
+    const catLabel = CATEGORIA_LABELS[p.categoria] || (p.categoria || '');
+
+    card.innerHTML = `
+        <div class="tarjeta-img-wrapper">
+            <img src="${p.imagen || 'https://via.placeholder.com/300x200?text=Sin+imagen'}"
+                 alt="${p.nombre}"
+                 onerror="this.src='https://via.placeholder.com/300x200?text=Sin+imagen'">
+            ${p.categoria ? `<span class="badge-categoria">${catLabel}</span>` : ''}
+        </div>
+        <div class="tarjeta-info">
+            <div class="tarjeta-nombre">${p.nombre}</div>
+            <div class="tarjeta-precio">$${Number(p.precio).toLocaleString('es-CO')}</div>
+            <div class="tarjeta-stock ${agotado ? 'agotado' : ''}">
+                ${agotado ? 'Agotado' : `${p.cantidad} disponibles`}
+            </div>
+        </div>
+        <div class="tarjeta-cantidad-controles" ${agotado ? 'style="opacity:0.4;pointer-events:none"' : ''}>
+            <button class="btn-qty-card btn-qty-bajar" title="Restar" ${agotado ? 'disabled' : ''}>−</button>
+            <input  class="input-qty-card" type="number" value="1" min="1" max="${p.cantidad}" ${agotado ? 'disabled' : ''}>
+            <button class="btn-qty-card btn-qty-subir" title="Sumar"  ${agotado ? 'disabled' : ''}>+</button>
+        </div>
+        <button class="btn-agregar" ${agotado ? 'disabled' : ''}>
+            ${agotado ? 'Agotado' : '🛒 Agregar al carrito'}
+        </button>
+    `;
+
+    if (!agotado) {
+        const inputQty = card.querySelector('.input-qty-card');
+        const btnBajar = card.querySelector('.btn-qty-bajar');
+        const btnSubir = card.querySelector('.btn-qty-subir');
+        const btnAgregar = card.querySelector('.btn-agregar');
+
+        // Flechas
+        btnSubir.addEventListener('click', () => {
+            let v = parseInt(inputQty.value) || 1;
+            if (v < p.cantidad) inputQty.value = v + 1;
+        });
+        btnBajar.addEventListener('click', () => {
+            let v = parseInt(inputQty.value) || 1;
+            if (v > 1) inputQty.value = v - 1;
+        });
+
+        // Validar escritura manual — siempre >= 1 y <= stock
+        inputQty.addEventListener('input', () => {
+            let v = parseInt(inputQty.value);
+            if (isNaN(v) || v < 1) inputQty.value = 1;
+            else if (v > p.cantidad) inputQty.value = p.cantidad;
+        });
+        inputQty.addEventListener('blur', () => {
+            if (!inputQty.value || parseInt(inputQty.value) < 1) inputQty.value = 1;
+        });
+
+        // Agregar al carrito
+        btnAgregar.addEventListener('click', () => {
+            const qty = parseInt(inputQty.value) || 1;
+            agregarAlCarritoConQty(p, qty);
+            inputQty.value = 1; // reset
+        });
+    }
+
+    return card;
 }
 
 function renderProductos(lista) {
     productosGrid.innerHTML = '';
     emptyMsg.style.display  = lista.length === 0 ? 'block' : 'none';
+    if (lista.length === 0) return;
 
-    lista.forEach((p, i) => {
-        const card = document.createElement('div');
-        card.className = 'tarjeta-tienda';
-        card.style.animationDelay = `${i * 0.05}s`;
-
-        const agotado = p.cantidad === 0;
-
-        card.innerHTML = `
-            <img src="${p.imagen || 'https://via.placeholder.com/300x200?text=Sin+imagen'}"
-                 alt="${p.nombre}"
-                 onerror="this.src='https://via.placeholder.com/300x200?text=Sin+imagen'">
-            <div class="tarjeta-info">
-                <div class="tarjeta-nombre">${p.nombre}</div>
-                <div class="tarjeta-precio">$${Number(p.precio).toLocaleString('es-CO')}</div>
-                <div class="tarjeta-stock ${agotado ? 'agotado' : ''}">
-                    ${agotado ? 'Agotado' : `${p.cantidad} disponibles`}
-                </div>
-            </div>
-            <button class="btn-agregar" data-id="${p.id}" ${agotado ? 'disabled' : ''}>
-                ${agotado ? 'Agotado' : '+ Agregar al carrito'}
-            </button>
-        `;
-
-        card.querySelector('.btn-agregar').addEventListener('click', () => agregarAlCarrito(p));
-        productosGrid.appendChild(card);
+    // Agrupar por categoría manteniendo el orden definido
+    const grupos = {};
+    lista.forEach(p => {
+        const cat = p.categoria || 'Otras';
+        if (!grupos[cat]) grupos[cat] = [];
+        grupos[cat].push(p);
     });
+
+    // Renderizar en el orden de ORDEN_CATEGORIAS; luego el resto
+    const catsEnUso = Object.keys(grupos);
+    const ordenFinal = [
+        ...ORDEN_CATEGORIAS.filter(c => catsEnUso.includes(c)),
+        ...catsEnUso.filter(c => !ORDEN_CATEGORIAS.includes(c))
+    ];
+
+    let idxGlobal = 0;
+    ordenFinal.forEach(cat => {
+        const prods = grupos[cat];
+        const seccion = document.createElement('div');
+        seccion.className = 'categoria-seccion';
+        seccion.dataset.cat = cat;
+
+        const titulo = document.createElement('h2');
+        titulo.className = 'categoria-titulo';
+        titulo.textContent = CATEGORIA_LABELS[cat] || cat;
+        seccion.appendChild(titulo);
+
+        const grid = document.createElement('div');
+        grid.className = 'categoria-grid';
+
+        prods.forEach(p => {
+            grid.appendChild(crearTarjetaProducto(p, idxGlobal++));
+        });
+
+        seccion.appendChild(grid);
+        productosGrid.appendChild(seccion);
+    });
+}
+
+// Iniciar botones de filtro por categoría
+function iniciarFiltrosCategorias() {
+    const btns = document.querySelectorAll('.btn-categoria');
+    btns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            btns.forEach(b => b.classList.remove('activa'));
+            btn.classList.add('activa');
+            const cat = btn.dataset.cat;
+            filtrarPorCategoria(cat);
+        });
+    });
+}
+
+function filtrarPorCategoria(cat) {
+    if (cat === 'todas') {
+        renderProductos(productos);
+        return;
+    }
+    renderProductos(productos.filter(p => (p.categoria || 'Otras') === cat));
 }
 
 // Búsqueda en tiempo real
 inputBuscar.addEventListener('input', () => {
     const term = inputBuscar.value.trim().toLowerCase();
+    // Resetear filtro de categorías visualmente
+    document.querySelectorAll('.btn-categoria').forEach(b => b.classList.remove('activa'));
+    const btnTodas = document.querySelector('.btn-categoria[data-cat="todas"]');
+    if (btnTodas) btnTodas.classList.add('activa');
+
     if (!term) { renderProductos(productos); return; }
     renderProductos(productos.filter(p =>
         p.nombre.toLowerCase().includes(term) ||
@@ -161,9 +285,18 @@ inputBuscar.addEventListener('input', () => {
 // ================================================================
 // CARRITO
 // ================================================================
+// Versión clásica (agrega 1 unidad — usada internamente)
 function agregarAlCarrito(producto) {
-    const existente      = carrito.find(i => i.producto.id === producto.id);
-    const enCarrito      = existente ? existente.qty : 0;
+    agregarAlCarritoConQty(producto, 1);
+}
+
+// Versión con cantidad personalizada — usada por las tarjetas
+function agregarAlCarritoConQty(producto, qty) {
+    qty = parseInt(qty) || 1;
+    if (qty < 1) qty = 1;
+
+    const existente       = carrito.find(i => i.producto.id === producto.id);
+    const enCarrito       = existente ? existente.qty : 0;
     const stockDisponible = producto.cantidad;
 
     if (enCarrito >= stockDisponible) {
@@ -171,8 +304,11 @@ function agregarAlCarrito(producto) {
         return;
     }
 
-    if (existente) { existente.qty++; }
-    else           { carrito.push({ producto, qty: 1 }); }
+    // Limitar al stock disponible
+    const qtyReal = Math.min(qty, stockDisponible - enCarrito);
+
+    if (existente) { existente.qty += qtyReal; }
+    else           { carrito.push({ producto, qty: qtyReal }); }
 
     actualizarCarritoUI();
     abrirCarrito();

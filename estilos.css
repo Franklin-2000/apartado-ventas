@@ -1,6 +1,7 @@
 /* ================================================================
-   TIENDA ONLINE — tienda.css
-   Paleta y tipografía coherente con el proyecto principal
+   TIENDA ONLINE — estilos.css
+   Paleta coherente con el proyecto principal
+   Login: fondo idéntico a pantalla-inicio del proyecto madre
 ================================================================ */
 
 :root {
@@ -29,39 +30,53 @@ body {
 }
 
 /* ================================================================
-   LOGIN
+   LOGIN — mismo fondo que pantalla-inicio del proyecto madre
 ================================================================ */
 #pantalla-login {
   min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
-  background: linear-gradient(135deg, #0c566c 0%, #1a7b98 50%, #48a4aa 100%);
   padding: 20px;
+  /* Fondo idéntico al del proyecto madre (#pantalla-inicio) */
+  background-image: 
+    linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)),
+    url(https://img.freepik.com/vector-premium/tecnologia-digital-compras-linea-icono-sobre-fondo-azul-marketing-tiendas-linea-comercio-electronico_252172-219.jpg);
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 .login-box {
-  background: var(--white);
-  border-radius: 24px;
-  padding: 50px 40px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 28px;
+  padding: 54px 44px;
   text-align: center;
-  box-shadow: var(--shadow-lg);
-  max-width: 400px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1);
+  max-width: 420px;
   width: 100%;
   animation: fadeUp 0.5s ease;
 }
 
 .logo-titulo {
   font-family: 'Pacifico', cursive;
-  font-size: 3em;
-  color: var(--primary);
+  font-size: 3.2em;
+  color: #ccbbbb;
+  text-shadow: 3px 3px 8px rgba(0, 0, 0, 0.9);
   margin-bottom: 10px;
+  font-style: italic;
 }
 
 .login-sub {
-  color: var(--text-soft);
-  margin-bottom: 30px;
+  color: rgba(255,255,255,0.88);
+  margin-bottom: 34px;
   font-size: 1.05em;
+  font-weight: 600;
+  text-shadow: 1px 1px 4px rgba(0,0,0,0.6);
 }
 
 .btn-google {
@@ -77,13 +92,15 @@ body {
   border-radius: 50px;
   font-size: 1em;
   font-weight: 700;
+  font-family: 'Nunito', sans-serif;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
 }
 
 .btn-google:hover {
   transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+  box-shadow: 0 10px 28px rgba(0,0,0,0.5);
+  background: #1a1a1a;
 }
 
 /* ================================================================
@@ -172,7 +189,7 @@ body {
 ================================================================ */
 .buscador-section {
   padding: 24px 30px 10px;
-  max-width: 600px;
+  max-width: 640px;
   margin: 0 auto;
 }
 
@@ -194,19 +211,86 @@ body {
 }
 
 /* ================================================================
-   GRID DE PRODUCTOS
+   FILTROS DE CATEGORÍA
 ================================================================ */
-.productos-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 24px;
-  padding: 20px 30px 60px;
+.categorias-filtro {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 30px 18px;
   max-width: 1400px;
   margin: 0 auto;
 }
 
-.tarjeta-tienda {
+.btn-categoria {
+  padding: 8px 16px;
+  border: 2px solid #ddd;
+  border-radius: 50px;
   background: var(--white);
+  color: var(--text-soft);
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.88em;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-categoria:hover {
+  border-color: var(--accent-dk);
+  color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(72,164,170,0.2);
+}
+
+.btn-categoria.activa {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--accent);
+  box-shadow: 0 4px 14px rgba(12,86,108,0.3);
+}
+
+/* ================================================================
+   CONTENIDO TIENDA (secciones por categoría)
+================================================================ */
+.tienda-contenido {
+  padding: 10px 30px 60px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Sección de una categoría */
+.categoria-seccion {
+  margin-bottom: 40px;
+  animation: fadeUp 0.4s ease both;
+}
+
+.categoria-titulo {
+  font-family: 'Pacifico', cursive;
+  font-size: 1.5em;
+  color: var(--primary);
+  font-style: italic;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 3px solid var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.categoria-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 22px;
+}
+
+/* ================================================================
+   TARJETA DE PRODUCTO
+   — Mismo estilo que inventario del proyecto madre
+   — Con controles de cantidad integrados
+================================================================ */
+.tarjeta-tienda {
+  background: rgba(255, 255, 255, 0.92);
   border-radius: var(--radius);
   overflow: hidden;
   box-shadow: var(--shadow);
@@ -214,49 +298,145 @@ body {
   flex-direction: column;
   transition: transform 0.25s, box-shadow 0.25s;
   animation: fadeUp 0.4s ease both;
+  border: 1px solid rgba(200,200,200,0.5);
 }
 
 .tarjeta-tienda:hover {
-  transform: translateY(-6px);
-  box-shadow: var(--shadow-lg);
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 0 18px 40px rgba(0,0,0,0.18);
 }
 
 .tarjeta-tienda img {
   width: 100%;
-  height: 200px;
+  height: 180px;
   object-fit: cover;
+  display: block;
+}
+
+/* Badge de categoría sobre la imagen */
+.badge-categoria {
+  display: inline-block;
+  background: var(--primary);
+  color: var(--accent);
+  font-size: 0.72em;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 0 0 8px 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.tarjeta-img-wrapper {
+  position: relative;
+  overflow: hidden;
 }
 
 .tarjeta-info {
-  padding: 14px 16px;
+  padding: 12px 14px 6px;
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
 .tarjeta-nombre {
-  font-size: 1em;
+  font-size: 0.97em;
   font-weight: 800;
   color: var(--text);
   line-height: 1.3;
 }
 
 .tarjeta-precio {
-  font-size: 1.3em;
+  font-size: 1.25em;
   font-weight: 800;
   color: var(--primary);
 }
 
 .tarjeta-stock {
-  font-size: 0.8em;
+  font-size: 0.78em;
   color: var(--text-soft);
 }
 
 .tarjeta-stock.agotado { color: var(--danger); font-weight: 700; }
 
+/* ----------------------------------------------------------------
+   CONTROLES DE CANTIDAD — en la tarjeta
+---------------------------------------------------------------- */
+.tarjeta-cantidad-controles {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin: 8px 14px 4px;
+  border: 2px solid #ddd;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.btn-qty-card {
+  width: 38px;
+  height: 38px;
+  background: var(--primary);
+  color: var(--accent);
+  border: none;
+  font-size: 1.3em;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, transform 0.1s;
+  flex-shrink: 0;
+  line-height: 1;
+  user-select: none;
+}
+
+.btn-qty-card:hover:not(:disabled) {
+  background: var(--primary-lt);
+}
+
+.btn-qty-card:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.btn-qty-card:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  color: #888;
+}
+
+.input-qty-card {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  border: none;
+  border-left: 2px solid #ddd;
+  border-right: 2px solid #ddd;
+  text-align: center;
+  font-size: 1em;
+  font-weight: 800;
+  font-family: 'Nunito', sans-serif;
+  color: var(--text);
+  background: #fff;
+  outline: none;
+  padding: 0 4px;
+  -moz-appearance: textfield;
+}
+
+.input-qty-card::-webkit-outer-spin-button,
+.input-qty-card::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.input-qty-card:focus {
+  background: #f0fafa;
+}
+
+/* Botón agregar al carrito */
 .btn-agregar {
-  margin: 0 16px 16px;
+  margin: 6px 14px 14px;
   padding: 10px;
   background: var(--primary);
   color: #fff;
@@ -363,8 +543,8 @@ body {
 }
 
 .carrito-item-info { display: flex; flex-direction: column; gap: 4px; }
-.carrito-item-nombre { font-weight: 700; font-size: 0.9em; }
-.carrito-item-precio { color: var(--primary); font-weight: 800; }
+.carrito-item-nombre { font-weight: 700; font-size: 0.9em; color: var(--text); }
+.carrito-item-precio { font-weight: 800; color: var(--primary); font-size: 0.95em; }
 
 .carrito-item-controles {
   display: flex;
@@ -376,14 +556,16 @@ body {
 .btn-qty {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
-  border: 2px solid var(--accent-dk);
-  background: none;
-  color: var(--primary);
-  font-size: 1.1em;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 1em;
   font-weight: 800;
   cursor: pointer;
-  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
   line-height: 1;
 }
 
@@ -636,10 +818,11 @@ body {
   letter-spacing: 0.5px;
 }
 
-.estado-pendiente  { background: #fff3cd; color: #856404; }
-.estado-pagado     { background: #d1e7dd; color: #0f5132; }
-.estado-entregado  { background: #cff4fc; color: #055160; }
-.estado-cancelado  { background: #f8d7da; color: #842029; }
+.estado-pendiente       { background: #fff3cd; color: #856404; }
+.estado-pagado          { background: #d1e7dd; color: #0f5132; }
+.estado-entregado       { background: #cff4fc; color: #055160; }
+.estado-cancelado       { background: #f8d7da; color: #842029; }
+.estado-esperando_pago  { background: #e2d9f3; color: #432874; }
 
 .pedido-card-body {
   display: none;
@@ -670,71 +853,36 @@ body {
 /* ================================================================
    RESPONSIVE
 ================================================================ */
+@media (max-width: 1024px) {
+  .tienda-header { padding: 12px 20px; }
+  .logo-header { font-size: 1.5em; }
+}
+
 @media (max-width: 768px) {
   .tienda-header { padding: 12px 16px; }
   .logo-header { font-size: 1.4em; }
-  .btn-mis-pedidos span { display: none; }
-  .productos-grid { padding: 16px; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+  .tienda-contenido { padding: 10px 16px 50px; }
+  .categorias-filtro { padding: 10px 16px 14px; gap: 8px; }
+  .btn-categoria { font-size: 0.8em; padding: 6px 12px; }
+  .categoria-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
   .buscador-section { padding: 16px 16px 6px; }
   .carrito-panel { width: 100%; max-width: 100%; }
   .modal-box { padding: 28px 20px; }
+  .login-box { padding: 36px 24px; }
+  .logo-titulo { font-size: 2.4em; }
 }
 
 @media (max-width: 480px) {
-  .productos-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 12px; }
-  .tarjeta-tienda img { height: 150px; }
+  .categoria-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .tarjeta-tienda img { height: 140px; }
   .metodos-pago { flex-direction: column; }
   .btn-mis-pedidos { padding: 8px 12px; font-size: 0.85em; }
   .btn-logout { padding: 8px 12px; font-size: 0.85em; }
-}
-/* ================================================================
-   RESPONSIVE DESIGN
-================================================================ */
-
-/* Tablets grandes (landscape) */
-@media (max-width: 1024px) {
-  .tienda-header {
-    padding: 12px 20px;
-  }
-  .logo-header {
-    font-size: 1.5em;
-  }
-}
-
-/* Tablets y móviles grandes */
-@media (max-width: 768px) {
+  .login-box { padding: 28px 16px; border-radius: 20px; }
+  .logo-titulo { font-size: 2em; }
   .tienda-header {
     flex-direction: column;
-    gap: 10px;
-    padding: 12px 15px;
-  }
-  
-  .login-box {
-    padding: 30px 20px;
-  }
-  
-  .logo-titulo {
-    font-size: 2em;
-  }
-}
-
-/* Móviles */
-@media (max-width: 480px) {
-  .tienda-header {
+    gap: 8px;
     padding: 10px 12px;
-  }
-  
-  .logo-header {
-    font-size: 1.3em;
-  }
-  
-  .btn-carrito, .btn-mis-pedidos {
-    padding: 8px 12px;
-    font-size: 0.9em;
-  }
-  
-  .login-box {
-    padding: 25px 15px;
-    border-radius: 16px;
   }
 }
