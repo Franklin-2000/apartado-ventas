@@ -1,14 +1,10 @@
 // ================================================================
 // TIENDA ONLINE — online.js
 // ================================================================
-// *** REEMPLAZA ESTOS VALORES ***
 const SB_URL          = "https://mhnhfdtdpryrjaeaymsa.supabase.co";
 const SB_KEY          = "sb_publishable_tiKyjeMyir7LD0EmFCdo8g_CqAXoM8R";
 const ANON_KEY        = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1obmhmZHRkcHJ5cmphZWF5bXNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NDE3MjAsImV4cCI6MjA5MjExNzcyMH0.UINKafSUr0jI1_NGrh3Z-Uzhwi6Euqot3WQMsliteug";
-const WOMPI_PUBLIC_KEY       = "pub_test_5eL1r2m92I05PsFi6Azw2ZP5cnyTKbcR";
-const WOMPI_INTEGRITY_SECRET = "test_integrity_qTioWDOwgynT8K9DSIHGkDCncyWHOiLz";
-const SUPABASE_FUNCTIONS_URL = 'https://mhnhfdtdpryrjaeaymsa.supabase.co/functions/v1';
-const WHATSAPP_ADMIN         = "573248298649";
+const WHATSAPP_ADMIN  = "573248298649";
 
 // ================================================================
 // *** EMAIL DEL ADMINISTRADOR (dueño de la tienda) ***
@@ -73,25 +69,9 @@ async function checkAuth() {
 async function iniciarSesion() {
     esAdmin = (currentUser.email === ADMIN_EMAIL);
 
-    // Cargamos el user_id del admin para filtrar productos
-    // (siempre lo necesitamos, sea admin o cliente)
     if (esAdmin) {
         adminUserId = currentUser.id;
     } else {
-        // Buscar el user_id del admin mediante RPC o tabla pública no es posible
-        // directamente desde el cliente con RLS, así que usamos la función es_admin()
-        // Solo necesitamos el user_id para filtrar productos; lo obtenemos
-        // leyendo un producto de la tienda (cualquiera con user_id del admin)
-        // Alternativamente usamos la constante hardcoded en la query del SQL.
-        // La solución más limpia: agregar una columna "tienda_owner_email" en productos
-        // y filtrar por email, pero como ya tenemos ADMIN_EMAIL, lo pasamos como filtro
-        // desde el JS al SQL usando la función eq() después de traer el adminUserId.
-        // Estrategia: usar .eq('user_id', adminUserId) requiere conocer el uuid,
-        // lo cual no tenemos en el cliente fácilmente. 
-        // SOLUCIÓN: Añadimos una función RPC get_admin_user_id() en el SQL más abajo,
-        // o simplemente consultamos con el filtro de email usando una función.
-        // Por ahora lo resolvemos cargando el primer producto visible para obtener el user_id,
-        // pero la solución CORRECTA es la RPC get_admin_user_id() que incluimos en el SQL nuevo.
         adminUserId = await obtenerAdminUserId();
     }
 
@@ -117,12 +97,10 @@ async function mostrarTienda() {
     pantLogin.style.display  = 'none';
     pantTienda.style.display = 'block';
 
-    // Mostrar/ocultar botón "Panel Admin" según rol
     const btnAdmin = document.getElementById('btnPanelAdmin');
     if (btnAdmin) btnAdmin.style.display = esAdmin ? 'inline-flex' : 'none';
 
     await cargarProductos();
-    verificarRetornoWompi();
 }
 
 btnGoogle.addEventListener('click', async () => {
@@ -159,7 +137,7 @@ async function cargarProductos() {
     const { data, error } = await sb
         .from('productos')
         .select('*')
-        .eq('user_id', adminUserId)   // ← FILTRO CLAVE: solo productos del admin
+        .eq('user_id', adminUserId)
         .gt('cantidad', 0)
         .order('categoria', { ascending: true })
         .order('nombre',    { ascending: true });
@@ -456,18 +434,16 @@ function limpiarFormCheckout() {
     document.getElementById('chkTelefono').value  = '';
     document.getElementById('chkDireccion').value = '';
     document.getElementById('chkNotas').value     = '';
-    document.querySelector('input[name="metodoPago"][value="contraentrega"]').checked = true;
 }
 
 // ================================================================
-// CONFIRMAR PEDIDO
+// CONFIRMAR PEDIDO — solo contra entrega
 // ================================================================
 btnConfirmarPedido.addEventListener('click', async () => {
     const nombre    = document.getElementById('chkNombre').value.trim();
     const telefono  = document.getElementById('chkTelefono').value.trim();
     const direccion = document.getElementById('chkDireccion').value.trim();
     const notas     = document.getElementById('chkNotas').value.trim();
-    const metodo    = document.querySelector('input[name="metodoPago"]:checked').value;
 
     if (!nombre || !telefono || !direccion) {
         alert('Por favor completa nombre, teléfono y dirección.');
@@ -480,8 +456,6 @@ btnConfirmarPedido.addEventListener('click', async () => {
     btnConfirmarPedido.textContent = 'Procesando...';
 
     try {
-        const estadoInicial = metodo === 'contraentrega' ? 'pendiente' : 'esperando_pago';
-
         const { data: pedidoData, error: pedidoError } = await sb
             .from('pedidos')
             .insert([{
@@ -492,8 +466,8 @@ btnConfirmarPedido.addEventListener('click', async () => {
                 direccion,
                 notas,
                 total,
-                metodo_pago:    metodo,
-                estado:         estadoInicial,
+                metodo_pago:    'contraentrega',
+                estado:         'pendiente',
                 fecha:          new Date().toISOString()
             }])
             .select()
@@ -512,11 +486,6 @@ btnConfirmarPedido.addEventListener('click', async () => {
 
         const { error: itemsError } = await sb.from('items_pedido').insert(items);
         if (itemsError) throw itemsError;
-
-        if (metodo === 'wompi') {
-            await redirigirWompi(pedidoData, total, nombre, currentUser.email, telefono);
-            return;
-        }
 
         carrito = [];
         actualizarCarritoUI();
@@ -537,65 +506,6 @@ btnConfirmarPedido.addEventListener('click', async () => {
         btnConfirmarPedido.textContent = 'Confirmar Pedido';
     }
 });
-
-// ================================================================
-// WOMPI
-// ================================================================
-async function redirigirWompi(pedido, total, nombre, email, telefono) {
-    const montoCentavos = Math.round(total * 100);
-    const referencia    = `PEDIDO-${pedido.id}-${Date.now()}`;
-    const urlRetorno    = `${window.location.origin}${window.location.pathname}?pedido_id=${pedido.id}&referencia=${referencia}`;
-    const firma         = await generarFirmaIntegridad(referencia, montoCentavos, 'COP', WOMPI_INTEGRITY_SECRET);
-
-    const wompiUrl = new URL('https://checkout.wompi.co/p/');
-    wompiUrl.searchParams.set('public-key',                        WOMPI_PUBLIC_KEY);
-    wompiUrl.searchParams.set('currency',                          'COP');
-    wompiUrl.searchParams.set('amount-in-cents',                   montoCentavos);
-    wompiUrl.searchParams.set('reference',                         referencia);
-    wompiUrl.searchParams.set('signature:integrity',               firma);
-    wompiUrl.searchParams.set('redirect-url',                      urlRetorno);
-    wompiUrl.searchParams.set('customer-data:email',               email);
-    wompiUrl.searchParams.set('customer-data:full-name',           nombre);
-    wompiUrl.searchParams.set('customer-data:phone-number',        telefono);
-    wompiUrl.searchParams.set('customer-data:phone-number-prefix', '+57');
-
-    localStorage.setItem('wompi_pedido_id',  pedido.id);
-    localStorage.setItem('wompi_referencia', referencia);
-
-    window.location.href = wompiUrl.toString();
-}
-
-async function verificarRetornoWompi() {
-    const params     = new URLSearchParams(window.location.search);
-    const pedidoId   = params.get('pedido_id');
-    const referencia = params.get('referencia');
-
-    if (!pedidoId || !referencia) return;
-    window.history.replaceState({}, '', window.location.pathname);
-
-    try {
-        const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/verificar-pago`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${ANON_KEY}`
-            },
-            body: JSON.stringify({ pedidoId, referencia })
-        });
-        const json = await res.json();
-
-        if (json.aprobado) {
-            carrito = [];
-            actualizarCarritoUI();
-            limpiarFormCheckout();
-            alert(`✅ ¡Pago aprobado!\nTu pedido #${pedidoId} fue confirmado.`);
-        } else {
-            alert(`❌ El pago no pudo completarse.\nPuedes intentarlo de nuevo.`);
-        }
-    } catch (err) {
-        console.error('Error verificando pago Wompi:', err);
-    }
-}
 
 // ================================================================
 // MIS PEDIDOS — el cliente ve sus propios pedidos
@@ -631,13 +541,11 @@ async function cargarMisPedidos() {
     listaMisPedidos.innerHTML = '';
 
     const etiquetaEstado = {
-        pendiente:       { texto: 'Pendiente — contra entrega', clase: 'estado-pendiente'  },
-        esperando_pago:  { texto: 'Esperando pago online',      clase: 'estado-pendiente'  },
-        pago_confirmado: { texto: '✅ Pago confirmado',         clase: 'estado-pagado'     },
-        despachado:      { texto: '🚚 En camino',               clase: 'estado-despachado' },
-        entregado:       { texto: '📦 Entregado',               clase: 'estado-entregado'  },
-        pago_fallido:    { texto: '❌ Pago fallido',            clase: 'estado-cancelado'  },
-        cancelado:       { texto: '🚫 Cancelado',               clase: 'estado-cancelado'  },
+        pendiente:       { texto: '⏳ Pendiente — contra entrega', clase: 'estado-pendiente'  },
+        pago_confirmado: { texto: '✅ Pago confirmado',            clase: 'estado-pagado'     },
+        despachado:      { texto: '🚚 En camino',                  clase: 'estado-despachado' },
+        entregado:       { texto: '📦 Entregado',                  clase: 'estado-entregado'  },
+        cancelado:       { texto: '🚫 Cancelado',                  clase: 'estado-cancelado'  },
     };
 
     data.forEach(pedido => {
@@ -663,7 +571,7 @@ async function cargarMisPedidos() {
                 </ul>
                 <div class="pedido-info-extra">
                     📍 ${pedido.direccion || '—'}<br>
-                    💳 ${pedido.metodo_pago === 'contraentrega' ? 'Contra entrega' : 'Online (Wompi)'}
+                    💵 Contra entrega
                     ${pedido.notas ? `<br>📝 ${pedido.notas}` : ''}
                 </div>
             </div>
@@ -702,36 +610,26 @@ function abrirWhatsAppAuto(direccion, nombre, pedidoId, total) {
     }
 }
 
-async function generarFirmaIntegridad(referencia, montoCentavos, moneda, secretoIntegridad) {
-    const cadena     = `${referencia}${Math.round(montoCentavos)}${moneda}${secretoIntegridad}`;
-    const encoder    = new TextEncoder();
-    const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(cadena));
-    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
 // ================================================================
 // ╔══════════════════════════════════════════════════════════════╗
 // ║               PANEL ADMINISTRADOR DE PEDIDOS                ║
-// ║  Solo visible para el admin. Permite confirmar pagos,       ║
+// ║  Solo visible para el admin. Permite confirmar pedidos,     ║
 // ║  marcar como despachado y entregado.                        ║
 // ╚══════════════════════════════════════════════════════════════╝
 // ================================================================
 
 const ESTADOS_ADMIN = {
-    pendiente:       { label: 'Pendiente',        clase: 'estado-pendiente',  acciones: ['pago_confirmado', 'cancelado'] },
-    esperando_pago:  { label: 'Esperando pago',   clase: 'estado-pendiente',  acciones: ['pago_confirmado', 'pago_fallido', 'cancelado'] },
-    pago_confirmado: { label: '✅ Pago confirmado',clase: 'estado-pagado',    acciones: ['despachado'] },
-    despachado:      { label: '🚚 Despachado',     clase: 'estado-despachado', acciones: ['entregado'] },
-    entregado:       { label: '📦 Entregado',      clase: 'estado-entregado',  acciones: [] },
-    pago_fallido:    { label: '❌ Pago fallido',   clase: 'estado-cancelado',  acciones: ['cancelado'] },
-    cancelado:       { label: '🚫 Cancelado',      clase: 'estado-cancelado',  acciones: [] },
+    pendiente:       { label: '⏳ Pendiente',      clase: 'estado-pendiente',  acciones: ['pago_confirmado', 'cancelado'] },
+    pago_confirmado: { label: '✅ Confirmado',      clase: 'estado-pagado',    acciones: ['despachado'] },
+    despachado:      { label: '🚚 Despachado',      clase: 'estado-despachado', acciones: ['entregado'] },
+    entregado:       { label: '📦 Entregado',       clase: 'estado-entregado',  acciones: [] },
+    cancelado:       { label: '🚫 Cancelado',       clase: 'estado-cancelado',  acciones: [] },
 };
 
 const ACCION_LABELS = {
-    pago_confirmado: '✅ Confirmar pago',
+    pago_confirmado: '✅ Confirmar pedido',
     despachado:      '🚚 Marcar despachado',
     entregado:       '📦 Marcar entregado',
-    pago_fallido:    '❌ Marcar pago fallido',
     cancelado:       '🚫 Cancelar pedido',
 };
 
@@ -740,15 +638,11 @@ function inyectarPanelAdmin() {
     if (document.getElementById('modalPanelAdmin')) return;
 
     const html = `
-    <!-- BOTÓN PANEL ADMIN en el header (se muestra solo si es admin) -->
-
-    <!-- MODAL PANEL ADMIN -->
     <div class="modal-overlay" id="modalPanelAdmin" style="display:none;">
         <div class="modal-box modal-box-admin">
             <button class="modal-cerrar" id="btnCerrarPanelAdmin">✕</button>
             <h2>🛠️ Panel de Pedidos</h2>
 
-            <!-- Filtros de estado -->
             <div class="admin-filtros">
                 <button class="btn-filtro-admin activo" data-estado="todos">🏪 Todos</button>
                 <button class="btn-filtro-admin" data-estado="pago_confirmado">✅ Confirmados</button>
@@ -765,7 +659,6 @@ function inyectarPanelAdmin() {
 
     document.body.insertAdjacentHTML('beforeend', html);
 
-    // Evento cerrar
     document.getElementById('btnCerrarPanelAdmin').addEventListener('click', () => {
         document.getElementById('modalPanelAdmin').style.display = 'none';
     });
@@ -774,7 +667,6 @@ function inyectarPanelAdmin() {
             document.getElementById('modalPanelAdmin').style.display = 'none';
     });
 
-    // Filtros
     document.querySelectorAll('.btn-filtro-admin').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.btn-filtro-admin').forEach(b => b.classList.remove('activo'));
@@ -784,7 +676,6 @@ function inyectarPanelAdmin() {
     });
 }
 
-// Variable global con todos los pedidos del admin
 let pedidosAdmin = [];
 
 async function abrirPanelAdmin() {
@@ -819,10 +710,9 @@ function filtrarPedidosAdmin(estado) {
     if (estado === 'todos') {
         lista = pedidosAdmin;
     } else if (estado === 'pago_confirmado') {
-        // "Confirmados" agrupa todos los pedidos activos en proceso:
-        // pendiente, esperando_pago, pago_confirmado y despachado
+        // "Confirmados" agrupa pendientes activos y confirmados en proceso
         lista = pedidosAdmin.filter(p =>
-            ['pendiente', 'esperando_pago', 'pago_confirmado', 'despachado'].includes(p.estado)
+            ['pendiente', 'pago_confirmado', 'despachado'].includes(p.estado)
         );
     } else {
         lista = pedidosAdmin.filter(p => p.estado === estado);
@@ -872,7 +762,7 @@ function renderPedidosAdmin(lista) {
                     <span>📧 ${pedido.cliente_email}</span>
                     <span>📞 ${pedido.cliente_tel}</span>
                     <span>📍 ${pedido.direccion}</span>
-                    <span>💳 ${pedido.metodo_pago === 'contraentrega' ? 'Contra entrega' : 'Online (Wompi)'}</span>
+                    <span>💵 Contra entrega</span>
                     ${pedido.notas ? `<span>📝 ${pedido.notas}</span>` : ''}
                 </div>
                 <div class="admin-items-lista">
@@ -902,7 +792,6 @@ function renderPedidosAdmin(lista) {
             </div>
         `;
 
-        // Toggle expandir/colapsar
         card.querySelector(`[data-toggle="${pedido.id}"]`).addEventListener('click', () => {
             const body = document.getElementById(`admin-body-${pedido.id}`);
             const icon = card.querySelector('.admin-toggle-icon');
@@ -911,11 +800,10 @@ function renderPedidosAdmin(lista) {
             icon.textContent   = abierto ? '▼' : '▲';
         });
 
-        // Botones de acción
         card.querySelectorAll('.btn-accion-admin').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 e.stopPropagation();
-                const pedidoId  = parseInt(btn.dataset.pedido);
+                const pedidoId    = parseInt(btn.dataset.pedido);
                 const nuevaAccion = btn.dataset.accion;
                 await cambiarEstadoPedido(pedidoId, nuevaAccion, btn);
             });
@@ -927,10 +815,9 @@ function renderPedidosAdmin(lista) {
 
 async function cambiarEstadoPedido(pedidoId, nuevoEstado, btnEl) {
     const confirmMsg = {
-        pago_confirmado: `¿Confirmar el pago del pedido #${pedidoId}?\n\nEsto descontará el inventario automáticamente.`,
+        pago_confirmado: `¿Confirmar el pedido #${pedidoId}?\n\nEsto descontará el inventario automáticamente.`,
         despachado:      `¿Marcar el pedido #${pedidoId} como despachado?`,
         entregado:       `¿Marcar el pedido #${pedidoId} como entregado?`,
-        pago_fallido:    `¿Marcar el pago del pedido #${pedidoId} como fallido?`,
         cancelado:       `¿Cancelar el pedido #${pedidoId}?`,
     };
 
@@ -950,16 +837,14 @@ async function cambiarEstadoPedido(pedidoId, nuevoEstado, btnEl) {
 
         alert(`✅ Pedido #${pedidoId} actualizado a: ${ACCION_LABELS[nuevoEstado] || nuevoEstado}`);
 
-        // Recargar la lista
         await cargarPedidosAdmin();
 
-        // Mantener el filtro activo
         const filtroActivo = document.querySelector('.btn-filtro-admin.activo');
         if (filtroActivo) filtrarPedidosAdmin(filtroActivo.dataset.estado);
 
     } catch (err) {
         console.error('Error al cambiar estado:', err);
-        alert(`❌ Error: ${err.message || 'No se pudo cambiar el estado. Verifica el stock si estás confirmando el pago.'}`);
+        alert(`❌ Error: ${err.message || 'No se pudo cambiar el estado.'}`);
         btnEl.disabled    = false;
         btnEl.textContent = textoOriginal;
     }
@@ -969,13 +854,11 @@ async function cambiarEstadoPedido(pedidoId, nuevoEstado, btnEl) {
 // INIT
 // ================================================================
 document.addEventListener('DOMContentLoaded', () => {
-    // Inyectar panel admin en el DOM antes de checkAuth
     inyectarPanelAdmin();
 
-    // Enlazar botón "Panel Admin" del header (definido en index.html)
     const btnAdmin = document.getElementById('btnPanelAdmin');
     if (btnAdmin) {
-        btnAdmin.style.display = 'none'; // oculto hasta verificar si es admin
+        btnAdmin.style.display = 'none';
         btnAdmin.addEventListener('click', abrirPanelAdmin);
     }
 
