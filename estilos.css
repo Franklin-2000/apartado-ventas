@@ -38,8 +38,7 @@ body {
   justify-content: center;
   align-items: center;
   padding: 20px;
-  /* Fondo idéntico al del proyecto madre (#pantalla-inicio) */
-  background-image: 
+  background-image:
     linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)),
     url(https://img.freepik.com/vector-premium/tecnologia-digital-compras-linea-icono-sobre-fondo-azul-marketing-tiendas-linea-comercio-electronico_252172-219.jpg);
   background-size: cover;
@@ -48,53 +47,166 @@ body {
   background-attachment: fixed;
 }
 
-.login-box {
-  background: rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 28px;
-  padding: 54px 44px;
-  text-align: center;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1);
-  max-width: 420px;
+/* ── Anillo animado (idéntico al proyecto principal) ── */
+.login-ring-container {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 420px;
+  height: 420px;
+}
+
+.animated-ring {
+  position: absolute;
   width: 100%;
-  animation: fadeUp 0.5s ease;
+  height: 100%;
+  border-radius: 50%;
+}
+
+.animated-ring .bar {
+  position: absolute;
+  top: calc(50% - 195px);
+  left: calc(50% - 6px);
+  width: 14px;
+  height: 38px;
+  border-radius: 5px;
+  transform-origin: 6px 195px;
+  background-color: #0d2233;
+  animation: barGlow 10s ease-in-out infinite;
+}
+
+.animated-ring .bar:nth-child(1)  { transform: rotate(0deg);   animation-delay: -10.0s; }
+.animated-ring .bar:nth-child(2)  { transform: rotate(6deg);   animation-delay: -9.9s; }
+.animated-ring .bar:nth-child(3)  { transform: rotate(12deg);  animation-delay: -9.8s; }
+.animated-ring .bar:nth-child(4)  { transform: rotate(18deg);  animation-delay: -9.7s; }
+.animated-ring .bar:nth-child(5)  { transform: rotate(24deg);  animation-delay: -9.6s; }
+.animated-ring .bar:nth-child(6)  { transform: rotate(30deg);  animation-delay: -9.5s; }
+.animated-ring .bar:nth-child(7)  { transform: rotate(36deg);  animation-delay: -9.4s; }
+.animated-ring .bar:nth-child(8)  { transform: rotate(42deg);  animation-delay: -9.3s; }
+.animated-ring .bar:nth-child(9)  { transform: rotate(48deg);  animation-delay: -9.2s; }
+.animated-ring .bar:nth-child(10) { transform: rotate(54deg);  animation-delay: -9.1s; }
+.animated-ring .bar:nth-child(11) { transform: rotate(60deg);  animation-delay: -9.0s; }
+.animated-ring .bar:nth-child(12) { transform: rotate(66deg);  animation-delay: -8.9s; }
+.animated-ring .bar:nth-child(13) { transform: rotate(72deg);  animation-delay: -8.8s; }
+.animated-ring .bar:nth-child(14) { transform: rotate(78deg);  animation-delay: -8.7s; }
+.animated-ring .bar:nth-child(15) { transform: rotate(84deg);  animation-delay: -8.6s; }
+.animated-ring .bar:nth-child(16) { transform: rotate(90deg);  animation-delay: -8.5s; }
+.animated-ring .bar:nth-child(17) { transform: rotate(96deg);  animation-delay: -8.4s; }
+.animated-ring .bar:nth-child(18) { transform: rotate(102deg); animation-delay: -8.3s; }
+.animated-ring .bar:nth-child(19) { transform: rotate(108deg); animation-delay: -8.2s; }
+.animated-ring .bar:nth-child(20) { transform: rotate(114deg); animation-delay: -8.1s; }
+.animated-ring .bar:nth-child(21) { transform: rotate(120deg); animation-delay: -8.0s; }
+.animated-ring .bar:nth-child(22) { transform: rotate(126deg); animation-delay: -7.9s; }
+.animated-ring .bar:nth-child(23) { transform: rotate(132deg); animation-delay: -7.8s; }
+.animated-ring .bar:nth-child(24) { transform: rotate(138deg); animation-delay: -7.7s; }
+.animated-ring .bar:nth-child(25) { transform: rotate(144deg); animation-delay: -7.6s; }
+.animated-ring .bar:nth-child(26) { transform: rotate(150deg); animation-delay: -7.5s; }
+.animated-ring .bar:nth-child(27) { transform: rotate(156deg); animation-delay: -7.4s; }
+.animated-ring .bar:nth-child(28) { transform: rotate(162deg); animation-delay: -7.3s; }
+.animated-ring .bar:nth-child(29) { transform: rotate(168deg); animation-delay: -7.2s; }
+.animated-ring .bar:nth-child(30) { transform: rotate(174deg); animation-delay: -7.1s; }
+.animated-ring .bar:nth-child(31) { transform: rotate(180deg); animation-delay: -7.0s; }
+.animated-ring .bar:nth-child(32) { transform: rotate(186deg); animation-delay: -6.9s; }
+.animated-ring .bar:nth-child(33) { transform: rotate(192deg); animation-delay: -6.8s; }
+.animated-ring .bar:nth-child(34) { transform: rotate(198deg); animation-delay: -6.7s; }
+.animated-ring .bar:nth-child(35) { transform: rotate(204deg); animation-delay: -6.6s; }
+.animated-ring .bar:nth-child(36) { transform: rotate(210deg); animation-delay: -6.5s; }
+.animated-ring .bar:nth-child(37) { transform: rotate(216deg); animation-delay: -6.4s; }
+.animated-ring .bar:nth-child(38) { transform: rotate(222deg); animation-delay: -6.3s; }
+.animated-ring .bar:nth-child(39) { transform: rotate(228deg); animation-delay: -6.2s; }
+.animated-ring .bar:nth-child(40) { transform: rotate(234deg); animation-delay: -6.1s; }
+.animated-ring .bar:nth-child(41) { transform: rotate(240deg); animation-delay: -6.0s; }
+.animated-ring .bar:nth-child(42) { transform: rotate(246deg); animation-delay: -5.9s; }
+.animated-ring .bar:nth-child(43) { transform: rotate(252deg); animation-delay: -5.8s; }
+.animated-ring .bar:nth-child(44) { transform: rotate(258deg); animation-delay: -5.7s; }
+.animated-ring .bar:nth-child(45) { transform: rotate(264deg); animation-delay: -5.6s; }
+.animated-ring .bar:nth-child(46) { transform: rotate(270deg); animation-delay: -5.5s; }
+.animated-ring .bar:nth-child(47) { transform: rotate(276deg); animation-delay: -5.4s; }
+.animated-ring .bar:nth-child(48) { transform: rotate(282deg); animation-delay: -5.3s; }
+.animated-ring .bar:nth-child(49) { transform: rotate(288deg); animation-delay: -5.2s; }
+.animated-ring .bar:nth-child(50) { transform: rotate(294deg); animation-delay: -5.1s; }
+.animated-ring .bar:nth-child(51) { transform: rotate(300deg); animation-delay: -5.0s; }
+.animated-ring .bar:nth-child(52) { transform: rotate(306deg); animation-delay: -4.9s; }
+.animated-ring .bar:nth-child(53) { transform: rotate(312deg); animation-delay: -4.8s; }
+.animated-ring .bar:nth-child(54) { transform: rotate(318deg); animation-delay: -4.7s; }
+.animated-ring .bar:nth-child(55) { transform: rotate(324deg); animation-delay: -4.6s; }
+.animated-ring .bar:nth-child(56) { transform: rotate(330deg); animation-delay: -4.5s; }
+.animated-ring .bar:nth-child(57) { transform: rotate(336deg); animation-delay: -4.4s; }
+.animated-ring .bar:nth-child(58) { transform: rotate(342deg); animation-delay: -4.3s; }
+.animated-ring .bar:nth-child(59) { transform: rotate(348deg); animation-delay: -4.2s; }
+.animated-ring .bar:nth-child(60) { transform: rotate(354deg); animation-delay: -4.1s; }
+
+@keyframes barGlow {
+  0%   { background-color: #0d2233; box-shadow: none; }
+  25%  { background-color: #00e5ff; box-shadow: 0 0 12px #00e5ff, 0 0 28px #00bcd4; }
+  50%  { background-color: #0d2233; box-shadow: none; }
+  75%  { background-color: #00e5ff; box-shadow: 0 0 12px #00e5ff, 0 0 28px #00bcd4; }
+  100% { background-color: #0d2233; box-shadow: none; }
+}
+
+/* Tarjeta central dentro del anillo */
+.login-box {
+  position: relative;
+  z-index: 10;
+  width: 260px;
+  min-height: 220px;
+  padding: 30px 28px 28px;
+  border-radius: 16px;
+  box-shadow: 0 0 40px rgba(0, 229, 255, 0.15), 0 4px 30px rgba(0,0,0,0.6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  animation: slideIn 0.5s ease;
+  background: linear-gradient(rgba(0,0,0,0.15), rgba(0,0,0,0.15)),
+    url(https://w0.peakpx.com/wallpaper/1011/312/HD-wallpaper-welcome-card-word-blue-black.jpg)
+    center/cover no-repeat;
+  border: 1px solid rgba(0, 229, 255, 0.18);
+  box-sizing: border-box;
+}
+
+@keyframes slideIn {
+  0%   { opacity: 0; transform: translateY(-20px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
 .logo-titulo {
   font-family: 'Pacifico', cursive;
-  font-size: 3.2em;
+  font-size: 2.4em;
   color: #ccbbbb;
   text-shadow: 3px 3px 8px rgba(0, 0, 0, 0.9);
-  margin-bottom: 10px;
+  margin: 0;
   font-style: italic;
+  line-height: 1.1;
 }
 
 .login-sub {
   color: rgba(255,255,255,0.88);
-  margin-bottom: 34px;
-  font-size: 1.05em;
+  margin: 0;
+  font-size: 0.92em;
   font-weight: 600;
-  text-shadow: 1px 1px 4px rgba(0,0,0,0.6);
+  text-shadow: 1px 1px 4px rgba(0,0,0,0.7);
 }
 
 .btn-google {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
-  padding: 14px 20px;
+  padding: 11px 16px;
   background: #000;
   color: #fff;
   border: none;
   border-radius: 50px;
-  font-size: 1em;
+  font-size: 0.88em;
   font-weight: 700;
   font-family: 'Nunito', sans-serif;
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+  white-space: nowrap;
 }
 
 .btn-google:hover {
@@ -868,8 +980,15 @@ body {
   .buscador-section { padding: 16px 16px 6px; }
   .carrito-panel { width: 100%; max-width: 100%; }
   .modal-box { padding: 28px 20px; }
-  .login-box { padding: 36px 24px; }
-  .logo-titulo { font-size: 2.4em; }
+  .login-ring-container { width: 320px; height: 320px; }
+  .animated-ring .bar {
+    top: calc(50% - 143px);
+    transform-origin: 6px 143px;
+    width: 11px;
+    height: 28px;
+  }
+  .login-box { width: 200px; min-height: 200px; padding: 24px 18px 22px; }
+  .logo-titulo { font-size: 2em; }
 }
 
 @media (max-width: 480px) {
@@ -878,13 +997,17 @@ body {
   .metodos-pago { flex-direction: column; }
   .btn-mis-pedidos { padding: 8px 12px; font-size: 0.85em; }
   .btn-logout { padding: 8px 12px; font-size: 0.85em; }
-  .login-box { padding: 28px 16px; border-radius: 20px; }
-  .logo-titulo { font-size: 2em; }
-  .tienda-header {
-    flex-direction: column;
-    gap: 8px;
-    padding: 10px 12px;
+  .login-ring-container { width: 270px; height: 270px; }
+  .animated-ring .bar {
+    top: calc(50% - 118px);
+    transform-origin: 6px 118px;
+    width: 10px;
+    height: 24px;
   }
+  .login-box { width: 175px; min-height: 185px; padding: 20px 14px 18px; border-radius: 12px; }
+  .logo-titulo { font-size: 1.7em; }
+  .login-sub { font-size: 0.8em; }
+  .btn-google { font-size: 0.78em; padding: 9px 10px; gap: 7px; }
 }
 /* ================================================================
    ESTADO DESPACHADO (faltaba en original)

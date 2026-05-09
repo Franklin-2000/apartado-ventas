@@ -750,13 +750,10 @@ function inyectarPanelAdmin() {
 
             <!-- Filtros de estado -->
             <div class="admin-filtros">
-                <button class="btn-filtro-admin activo" data-estado="todos">Todos</button>
-                <button class="btn-filtro-admin" data-estado="pendiente">Pendientes</button>
-                <button class="btn-filtro-admin" data-estado="esperando_pago">Esperando pago</button>
-                <button class="btn-filtro-admin" data-estado="pago_confirmado">Confirmados</button>
-                <button class="btn-filtro-admin" data-estado="despachado">Despachados</button>
-                <button class="btn-filtro-admin" data-estado="entregado">Entregados</button>
-                <button class="btn-filtro-admin" data-estado="cancelado">Cancelados</button>
+                <button class="btn-filtro-admin activo" data-estado="todos">🏪 Todos</button>
+                <button class="btn-filtro-admin" data-estado="pago_confirmado">✅ Confirmados</button>
+                <button class="btn-filtro-admin" data-estado="entregado">📦 Entregados</button>
+                <button class="btn-filtro-admin" data-estado="cancelado">🚫 Cancelados</button>
             </div>
 
             <div id="adminListaPedidos" class="admin-lista-pedidos">
@@ -818,9 +815,18 @@ async function cargarPedidosAdmin() {
 }
 
 function filtrarPedidosAdmin(estado) {
-    const lista = estado === 'todos'
-        ? pedidosAdmin
-        : pedidosAdmin.filter(p => p.estado === estado);
+    let lista;
+    if (estado === 'todos') {
+        lista = pedidosAdmin;
+    } else if (estado === 'pago_confirmado') {
+        // "Confirmados" agrupa todos los pedidos activos en proceso:
+        // pendiente, esperando_pago, pago_confirmado y despachado
+        lista = pedidosAdmin.filter(p =>
+            ['pendiente', 'esperando_pago', 'pago_confirmado', 'despachado'].includes(p.estado)
+        );
+    } else {
+        lista = pedidosAdmin.filter(p => p.estado === estado);
+    }
     renderPedidosAdmin(lista);
 }
 
