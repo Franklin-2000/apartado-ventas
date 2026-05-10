@@ -4,7 +4,7 @@
 const SB_URL          = "https://mhnhfdtdpryrjaeaymsa.supabase.co";
 const SB_KEY          = "sb_publishable_tiKyjeMyir7LD0EmFCdo8g_CqAXoM8R";
 const ANON_KEY        = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1obmhmZHRkcHJ5cmphZWF5bXNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NDE3MjAsImV4cCI6MjA5MjExNzcyMH0.UINKafSUr0jI1_NGrh3Z-Uzhwi6Euqot3WQMsliteug";
-const WHATSAPP_ADMIN  = "573248298649";
+const WHATSAPP_ADMIN  = "573505969916";
 
 // ================================================================
 // *** EMAIL DEL ADMINISTRADOR (dueño de la tienda) ***
