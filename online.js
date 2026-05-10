@@ -97,9 +97,6 @@ async function mostrarTienda() {
     pantLogin.style.display  = 'none';
     pantTienda.style.display = 'block';
 
-    const btnAdmin = document.getElementById('btnPanelAdmin');
-    if (btnAdmin) btnAdmin.style.display = esAdmin ? 'inline-flex' : 'none';
-
     await cargarProductos();
 }
 
@@ -111,12 +108,13 @@ btnGoogle.addEventListener('click', async () => {
 });
 
 btnLogout.addEventListener('click', async () => {
-    await sb.auth.signOut();
-    carrito      = [];
-    currentUser  = null;
-    esAdmin      = false;
-    adminUserId  = null;
-    mostrarLogin();
+    await sb.auth.signOut({ scope: 'local' });
+    carrito     = [];
+    currentUser = null;
+    esAdmin     = false;
+    adminUserId = null;
+    // Recarga limpia para que Google OAuth no quede bloqueado
+    window.location.href = window.location.pathname + window.location.search;
 });
 
 // ================================================================
@@ -217,17 +215,6 @@ function crearTarjetaProducto(p, idx) {
             let v = parseInt(inputQty.value) || 1;
             if (v > 1) inputQty.value = v - 1;
         });
-        inputQty.addEventListener('focus', () => {
-            inputQty.select();
-        });
-        inputQty.addEventListener('click', () => {
-            setTimeout(() => inputQty.select(), 0);
-        });
-        inputQty.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            inputQty.focus();
-            setTimeout(() => inputQty.select(), 50);
-        });
         inputQty.addEventListener('input', () => {
             let v = parseInt(inputQty.value);
             if (isNaN(v) || v < 1)        inputQty.value = 1;
@@ -235,14 +222,6 @@ function crearTarjetaProducto(p, idx) {
         });
         inputQty.addEventListener('blur', () => {
             if (!inputQty.value || parseInt(inputQty.value) < 1) inputQty.value = 1;
-        });
-        inputQty.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                const qty = parseInt(inputQty.value) || 1;
-                agregarAlCarritoConQty(p, qty);
-                inputQty.value = 1;
-            }
         });
         btnAgregar.addEventListener('click', () => {
             const qty = parseInt(inputQty.value) || 1;
@@ -516,7 +495,7 @@ btnConfirmarPedido.addEventListener('click', async () => {
         alert(`✅ ¡Pedido #${pedidoData.id} recibido!\n\nTe contactaremos para coordinar la entrega.\nEl pago se realizará al momento de la entrega.`);
 
         setTimeout(() => {
-            abrirWhatsAppAuto(direccion, nombre, pedidoData.id, total);
+            abrirWhatsAppAuto(direccion, nombre, pedidoData.id, total, items);
         }, 1000);
 
     } catch (err) {
@@ -610,11 +589,18 @@ async function cargarMisPedidos() {
 // ================================================================
 // WHATSAPP AUTO
 // ================================================================
-function abrirWhatsAppAuto(direccion, nombre, pedidoId, total) {
-    const mensaje = `📦 *Nuevo Pedido #${pedidoId}*\n\n` +
+function abrirWhatsAppAuto(direccion, nombre, pedidoId, total, items) {
+    // Construir lista detallada de productos
+    const lineasProductos = items.map(i =>
+        `  • ${i.nombre}\n    ${i.cantidad} x $${Number(i.precio).toLocaleString('es-CO')} = *$${Number(i.subtotal).toLocaleString('es-CO')}*`
+    ).join('\n');
+
+    const mensaje =
+        `📦 *Nuevo Pedido #${pedidoId}*\n\n` +
         `👤 *Cliente:* ${nombre}\n` +
-        `💰 *Total:* $${Number(total).toLocaleString('es-CO')}\n` +
         `📍 *Dirección:* ${direccion}\n\n` +
+        `🛒 *Productos:*\n${lineasProductos}\n\n` +
+        `💰 *Total a pagar:* $${Number(total).toLocaleString('es-CO')}\n\n` +
         `Hola, acabo de hacer un pedido y me gustaría coordinar la entrega.`;
 
     const ventana = window.open(`https://wa.me/${WHATSAPP_ADMIN}?text=${encodeURIComponent(mensaje)}`, '_blank');
@@ -632,257 +618,9 @@ function abrirWhatsAppAuto(direccion, nombre, pedidoId, total) {
 }
 
 // ================================================================
-// ╔══════════════════════════════════════════════════════════════╗
-// ║               PANEL ADMINISTRADOR DE PEDIDOS                ║
-// ║  Solo visible para el admin. Permite confirmar pedidos,     ║
-// ║  marcar como despachado y entregado.                        ║
-// ╚══════════════════════════════════════════════════════════════╝
-// ================================================================
-
-const ESTADOS_ADMIN = {
-    pendiente:       { label: '⏳ Pendiente',      clase: 'estado-pendiente',  acciones: ['pago_confirmado', 'cancelado'] },
-    pago_confirmado: { label: '✅ Confirmado',      clase: 'estado-pagado',    acciones: ['despachado'] },
-    despachado:      { label: '🚚 Despachado',      clase: 'estado-despachado', acciones: ['entregado'] },
-    entregado:       { label: '📦 Entregado',       clase: 'estado-entregado',  acciones: [] },
-    cancelado:       { label: '🚫 Cancelado',       clase: 'estado-cancelado',  acciones: [] },
-};
-
-const ACCION_LABELS = {
-    pago_confirmado: '✅ Confirmar pedido',
-    despachado:      '🚚 Marcar despachado',
-    entregado:       '📦 Marcar entregado',
-    cancelado:       '🚫 Cancelar pedido',
-};
-
-// Inyectar el modal del panel admin en el DOM
-function inyectarPanelAdmin() {
-    if (document.getElementById('modalPanelAdmin')) return;
-
-    const html = `
-    <div class="modal-overlay" id="modalPanelAdmin" style="display:none;">
-        <div class="modal-box modal-box-admin">
-            <button class="modal-cerrar" id="btnCerrarPanelAdmin">✕</button>
-            <h2>🛠️ Panel de Pedidos</h2>
-
-            <div class="admin-filtros">
-                <button class="btn-filtro-admin activo" data-estado="todos">🏪 Todos</button>
-                <button class="btn-filtro-admin" data-estado="pago_confirmado">✅ Confirmados</button>
-                <button class="btn-filtro-admin" data-estado="entregado">📦 Entregados</button>
-                <button class="btn-filtro-admin" data-estado="cancelado">🚫 Cancelados</button>
-            </div>
-
-            <div id="adminListaPedidos" class="admin-lista-pedidos">
-                <p>Cargando pedidos...</p>
-            </div>
-        </div>
-    </div>
-    `;
-
-    document.body.insertAdjacentHTML('beforeend', html);
-
-    document.getElementById('btnCerrarPanelAdmin').addEventListener('click', () => {
-        document.getElementById('modalPanelAdmin').style.display = 'none';
-    });
-    document.getElementById('modalPanelAdmin').addEventListener('click', e => {
-        if (e.target === document.getElementById('modalPanelAdmin'))
-            document.getElementById('modalPanelAdmin').style.display = 'none';
-    });
-
-    document.querySelectorAll('.btn-filtro-admin').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.btn-filtro-admin').forEach(b => b.classList.remove('activo'));
-            btn.classList.add('activo');
-            filtrarPedidosAdmin(btn.dataset.estado);
-        });
-    });
-}
-
-let pedidosAdmin = [];
-
-async function abrirPanelAdmin() {
-    document.getElementById('modalPanelAdmin').style.display = 'flex';
-    document.getElementById('adminListaPedidos').innerHTML   = '<p class="admin-cargando">Cargando pedidos...</p>';
-    await cargarPedidosAdmin();
-}
-
-async function cargarPedidosAdmin() {
-    const { data, error } = await sb
-        .from('pedidos')
-        .select(`
-            id, estado, total, metodo_pago, fecha,
-            cliente_nombre, cliente_email, cliente_tel,
-            direccion, notas, fecha_confirmacion,
-            items_pedido (nombre, cantidad, precio, subtotal)
-        `)
-        .order('id', { ascending: false });
-
-    if (error) {
-        document.getElementById('adminListaPedidos').innerHTML =
-            `<p style="color:red; padding:20px;">Error al cargar pedidos: ${error.message}</p>`;
-        return;
-    }
-
-    pedidosAdmin = data || [];
-    filtrarPedidosAdmin('todos');
-}
-
-function filtrarPedidosAdmin(estado) {
-    let lista;
-    if (estado === 'todos') {
-        lista = pedidosAdmin;
-    } else if (estado === 'pago_confirmado') {
-        // "Confirmados" agrupa pendientes activos y confirmados en proceso
-        lista = pedidosAdmin.filter(p =>
-            ['pendiente', 'pago_confirmado', 'despachado'].includes(p.estado)
-        );
-    } else {
-        lista = pedidosAdmin.filter(p => p.estado === estado);
-    }
-    renderPedidosAdmin(lista);
-}
-
-function renderPedidosAdmin(lista) {
-    const contenedor = document.getElementById('adminListaPedidos');
-
-    if (lista.length === 0) {
-        contenedor.innerHTML = '<p class="admin-vacio">No hay pedidos en este estado.</p>';
-        return;
-    }
-
-    contenedor.innerHTML = '';
-
-    lista.forEach(pedido => {
-        const estadoInfo = ESTADOS_ADMIN[pedido.estado] || { label: pedido.estado, clase: '', acciones: [] };
-        const fecha      = new Date(pedido.fecha).toLocaleString('es-CO');
-
-        const card = document.createElement('div');
-        card.className       = 'admin-pedido-card';
-        card.dataset.pedidoId = pedido.id;
-
-        const botonesAccion = estadoInfo.acciones.map(accion => `
-            <button class="btn-accion-admin btn-accion-${accion}"
-                    data-pedido="${pedido.id}"
-                    data-accion="${accion}">
-                ${ACCION_LABELS[accion] || accion}
-            </button>
-        `).join('');
-
-        card.innerHTML = `
-            <div class="admin-pedido-header" data-toggle="${pedido.id}">
-                <div class="admin-pedido-id-fecha">
-                    <span class="admin-pedido-num">Pedido #${pedido.id}</span>
-                    <span class="admin-pedido-fecha">${fecha}</span>
-                </div>
-                <span class="pedido-estado ${estadoInfo.clase}">${estadoInfo.label}</span>
-                <span class="admin-pedido-total">$${Number(pedido.total).toLocaleString('es-CO')}</span>
-                <span class="admin-toggle-icon">▼</span>
-            </div>
-            <div class="admin-pedido-body" id="admin-body-${pedido.id}" style="display:none;">
-                <div class="admin-cliente-info">
-                    <strong>👤 ${pedido.cliente_nombre}</strong>
-                    <span>📧 ${pedido.cliente_email}</span>
-                    <span>📞 ${pedido.cliente_tel}</span>
-                    <span>📍 ${pedido.direccion}</span>
-                    <span>💵 Contra entrega</span>
-                    ${pedido.notas ? `<span>📝 ${pedido.notas}</span>` : ''}
-                </div>
-                <div class="admin-items-lista">
-                    <table class="admin-tabla-items">
-                        <thead>
-                            <tr><th>Producto</th><th>Cant.</th><th>Precio</th><th>Subtotal</th></tr>
-                        </thead>
-                        <tbody>
-                            ${pedido.items_pedido.map(i => `
-                                <tr>
-                                    <td>${i.nombre}</td>
-                                    <td>${i.cantidad}</td>
-                                    <td>$${Number(i.precio).toLocaleString('es-CO')}</td>
-                                    <td>$${Number(i.subtotal).toLocaleString('es-CO')}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                        <tfoot>
-                            <tr>
-                                <td colspan="3"><strong>Total</strong></td>
-                                <td><strong>$${Number(pedido.total).toLocaleString('es-CO')}</strong></td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-                ${botonesAccion ? `<div class="admin-acciones">${botonesAccion}</div>` : ''}
-            </div>
-        `;
-
-        card.querySelector(`[data-toggle="${pedido.id}"]`).addEventListener('click', () => {
-            const body = document.getElementById(`admin-body-${pedido.id}`);
-            const icon = card.querySelector('.admin-toggle-icon');
-            const abierto = body.style.display === 'block';
-            body.style.display = abierto ? 'none' : 'block';
-            icon.textContent   = abierto ? '▼' : '▲';
-        });
-
-        card.querySelectorAll('.btn-accion-admin').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                const pedidoId    = parseInt(btn.dataset.pedido);
-                const nuevaAccion = btn.dataset.accion;
-                await cambiarEstadoPedido(pedidoId, nuevaAccion, btn);
-            });
-        });
-
-        contenedor.appendChild(card);
-    });
-}
-
-async function cambiarEstadoPedido(pedidoId, nuevoEstado, btnEl) {
-    const confirmMsg = {
-        pago_confirmado: `¿Confirmar el pedido #${pedidoId}?\n\nEsto descontará el inventario automáticamente.`,
-        despachado:      `¿Marcar el pedido #${pedidoId} como despachado?`,
-        entregado:       `¿Marcar el pedido #${pedidoId} como entregado?`,
-        cancelado:       `¿Cancelar el pedido #${pedidoId}?`,
-    };
-
-    if (!confirm(confirmMsg[nuevoEstado] || `¿Cambiar estado a "${nuevoEstado}"?`)) return;
-
-    const textoOriginal  = btnEl.textContent;
-    btnEl.disabled       = true;
-    btnEl.textContent    = 'Procesando...';
-
-    try {
-        const { error } = await sb.rpc('cambiar_estado_pedido', {
-            p_pedido_id:    pedidoId,
-            p_nuevo_estado: nuevoEstado
-        });
-
-        if (error) throw error;
-
-        alert(`✅ Pedido #${pedidoId} actualizado a: ${ACCION_LABELS[nuevoEstado] || nuevoEstado}`);
-
-        await cargarPedidosAdmin();
-
-        const filtroActivo = document.querySelector('.btn-filtro-admin.activo');
-        if (filtroActivo) filtrarPedidosAdmin(filtroActivo.dataset.estado);
-
-    } catch (err) {
-        console.error('Error al cambiar estado:', err);
-        alert(`❌ Error: ${err.message || 'No se pudo cambiar el estado.'}`);
-        btnEl.disabled    = false;
-        btnEl.textContent = textoOriginal;
-    }
-}
-
-// ================================================================
 // INIT
 // ================================================================
 document.addEventListener('DOMContentLoaded', () => {
-    inyectarPanelAdmin();
-
-    const btnAdmin = document.getElementById('btnPanelAdmin');
-    if (btnAdmin) {
-        btnAdmin.style.display = 'none';
-        btnAdmin.addEventListener('click', abrirPanelAdmin);
-    }
-
     checkAuth();
 
     sb.auth.onAuthStateChange((_event, session) => {
