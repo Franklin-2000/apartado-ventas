@@ -54,6 +54,65 @@ const btnCerrarMisPedidos = document.getElementById('btnCerrarMisPedidos');
 const listaMisPedidos     = document.getElementById('listaMisPedidos');
 
 // ================================================================
+// ALERTA PERSONALIZADA — Enter = Aceptar
+// ================================================================
+function mostrarAlerta(mensaje) {
+    return new Promise(resolve => {
+        // Crear overlay
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position:fixed; inset:0; background:rgba(0,0,0,0.55);
+            display:flex; align-items:center; justify-content:center;
+            z-index:99999; animation:fadeIn .15s ease;
+        `;
+
+        const box = document.createElement('div');
+        box.style.cssText = `
+            background:#fff; border-radius:18px; padding:32px 28px 24px;
+            max-width:380px; width:90%; box-shadow:0 8px 40px rgba(0,0,0,0.22);
+            text-align:center; font-family:'Nunito',sans-serif;
+            animation:scaleIn .18s ease;
+        `;
+
+        const msg = document.createElement('p');
+        msg.style.cssText = `
+            margin:0 0 24px; font-size:1rem; color:#222;
+            line-height:1.6; white-space:pre-line;
+        `;
+        msg.textContent = mensaje;
+
+        const btn = document.createElement('button');
+        btn.textContent = 'Aceptar';
+        btn.style.cssText = `
+            background:linear-gradient(135deg,#6c63ff,#a78bfa);
+            color:#fff; border:none; border-radius:50px;
+            padding:11px 40px; font-size:1rem; font-weight:700;
+            cursor:pointer; font-family:'Nunito',sans-serif;
+            transition:transform .1s, box-shadow .1s;
+        `;
+        btn.addEventListener('mouseenter', () => { btn.style.transform = 'scale(1.04)'; });
+        btn.addEventListener('mouseleave', () => { btn.style.transform = 'scale(1)'; });
+
+        const cerrar = () => { document.body.removeChild(overlay); resolve(); };
+        btn.addEventListener('click', cerrar);
+
+        // Enter cierra la alerta
+        const onKey = (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); document.removeEventListener('keydown', onKey); cerrar(); }
+        };
+        document.addEventListener('keydown', onKey);
+
+        box.appendChild(msg);
+        box.appendChild(btn);
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+
+        // Enfocar el botón para que Enter funcione sin hacer nada extra
+        setTimeout(() => btn.focus(), 50);
+    });
+}
+
+// ================================================================
 // AUTH — Login con Google
 // ================================================================
 async function checkAuth() {
@@ -328,7 +387,7 @@ inputBuscar.addEventListener('input', () => {
 // ================================================================
 function agregarAlCarrito(producto) { agregarAlCarritoConQty(producto, 1); }
 
-function agregarAlCarritoConQty(producto, qty) {
+async function agregarAlCarritoConQty(producto, qty) {
     qty = parseInt(qty) || 1;
     if (qty < 1) qty = 1;
 
@@ -337,7 +396,7 @@ function agregarAlCarritoConQty(producto, qty) {
     const stockDisponible = producto.cantidad;
 
     if (enCarrito >= stockDisponible) {
-        alert(`Solo hay ${stockDisponible} unidades disponibles de "${producto.nombre}".`);
+        await mostrarAlerta(`Solo hay ${stockDisponible} unidades disponibles de "${producto.nombre}".`);
         return;
     }
 
@@ -354,14 +413,14 @@ function quitarDelCarrito(productoId) {
     actualizarCarritoUI();
 }
 
-function cambiarQty(productoId, delta) {
+async function cambiarQty(productoId, delta) {
     const item = carrito.find(i => i.producto.id === productoId);
     if (!item) return;
     item.qty += delta;
     if (item.qty <= 0) { quitarDelCarrito(productoId); return; }
     if (item.qty > item.producto.cantidad) {
         item.qty = item.producto.cantidad;
-        alert(`Máximo ${item.producto.cantidad} unidades disponibles.`);
+        await mostrarAlerta(`Máximo ${item.producto.cantidad} unidades disponibles.`);
     }
     actualizarCarritoUI();
 }
@@ -427,8 +486,8 @@ carritoOverlay.addEventListener('click', cerrarCarrito);
 // ================================================================
 // CHECKOUT
 // ================================================================
-btnCheckout.addEventListener('click', () => {
-    if (carrito.length === 0) { alert('Tu carrito está vacío.'); return; }
+btnCheckout.addEventListener('click', async () => {
+    if (carrito.length === 0) { await mostrarAlerta('Tu carrito está vacío.'); return; }
     cerrarCarrito();
     abrirModalCheckout();
 });
@@ -467,7 +526,7 @@ btnConfirmarPedido.addEventListener('click', async () => {
     const notas     = document.getElementById('chkNotas').value.trim();
 
     if (!nombre || !telefono || !direccion) {
-        alert('Por favor completa nombre, teléfono y dirección.');
+        await mostrarAlerta('Por favor completa nombre, teléfono y dirección.');
         return;
     }
 
@@ -513,7 +572,7 @@ btnConfirmarPedido.addEventListener('click', async () => {
         modalCheckout.style.display = 'none';
         limpiarFormCheckout();
 
-        alert(`✅ ¡Pedido #${pedidoData.id} recibido!\n\nTe contactaremos para coordinar la entrega.\nEl pago se realizará al momento de la entrega.`);
+        await mostrarAlerta(`✅ ¡Pedido #${pedidoData.id} recibido!\n\nTe contactaremos para coordinar la entrega.\nEl pago se realizará al momento de la entrega.`);
 
         setTimeout(() => {
             abrirWhatsAppAuto(direccion, nombre, pedidoData.id, total, items);
@@ -521,7 +580,7 @@ btnConfirmarPedido.addEventListener('click', async () => {
 
     } catch (err) {
         console.error('Error al confirmar pedido:', err);
-        alert('Hubo un error al procesar tu pedido. Intenta de nuevo.');
+        await mostrarAlerta('Hubo un error al procesar tu pedido. Intenta de nuevo.');
     } finally {
         btnConfirmarPedido.disabled    = false;
         btnConfirmarPedido.textContent = 'Confirmar Pedido';
@@ -613,8 +672,8 @@ async function cargarMisPedidos() {
 function abrirWhatsAppAuto(direccion, nombre, pedidoId, total, items) {
     // Construir lista detallada de productos
     const lineasProductos = items.map(i =>
-        `  • ${i.nombre}\n    ${i.cantidad} x $${Number(i.precio).toLocaleString('es-CO')} = *$${Number(i.subtotal).toLocaleString('es-CO')}*`
-    ).join('\n');
+        `  • *${i.nombre}*\n    ${i.cantidad} x $${Number(i.precio).toLocaleString('es-CO')} = *$${Number(i.subtotal).toLocaleString('es-CO')}*`
+    ).join('\n\n');
 
     const mensaje =
         `📦 *Nuevo Pedido #${pedidoId}*\n\n` +
@@ -628,8 +687,8 @@ function abrirWhatsAppAuto(direccion, nombre, pedidoId, total, items) {
 
     if (!ventana || ventana.closed || typeof ventana.closed === 'undefined') {
         if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(mensaje).then(() => {
-                alert('📱 Se copió el mensaje al portapapeles.\n\nAbre WhatsApp y pega el mensaje para chatear con el vendedor.');
+            navigator.clipboard.writeText(mensaje).then(async () => {
+                await mostrarAlerta('📱 Se copió el mensaje al portapapeles.\n\nAbre WhatsApp y pega el mensaje para chatear con el vendedor.');
                 window.open('https://web.whatsapp.com', '_blank');
             }).catch(() => { prompt('Copia este mensaje y envíalo por WhatsApp:', mensaje); });
         } else {
@@ -650,4 +709,4 @@ document.addEventListener('DOMContentLoaded', () => {
             iniciarSesion();
         }
     });
-}); 
+});
