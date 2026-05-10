@@ -217,6 +217,17 @@ function crearTarjetaProducto(p, idx) {
             let v = parseInt(inputQty.value) || 1;
             if (v > 1) inputQty.value = v - 1;
         });
+        inputQty.addEventListener('focus', () => {
+            inputQty.select();
+        });
+        inputQty.addEventListener('click', () => {
+            setTimeout(() => inputQty.select(), 0);
+        });
+        inputQty.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            inputQty.focus();
+            setTimeout(() => inputQty.select(), 50);
+        });
         inputQty.addEventListener('input', () => {
             let v = parseInt(inputQty.value);
             if (isNaN(v) || v < 1)        inputQty.value = 1;
@@ -224,6 +235,14 @@ function crearTarjetaProducto(p, idx) {
         });
         inputQty.addEventListener('blur', () => {
             if (!inputQty.value || parseInt(inputQty.value) < 1) inputQty.value = 1;
+        });
+        inputQty.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const qty = parseInt(inputQty.value) || 1;
+                agregarAlCarritoConQty(p, qty);
+                inputQty.value = 1;
+            }
         });
         btnAgregar.addEventListener('click', () => {
             const qty = parseInt(inputQty.value) || 1;
