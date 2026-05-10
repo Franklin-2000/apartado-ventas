@@ -153,7 +153,7 @@ async function cargarProductos() {
 
     productos = data || [];
     if (productos.length === 0) { emptyMsg.style.display = 'block'; return; }
-    renderProductos(productos);
+    renderProductos(productos, true);   // Vista "Todas": sin títulos de categoría
     iniciarFiltrosCategorias();
 }
 
@@ -235,7 +235,7 @@ function crearTarjetaProducto(p, idx) {
     return card;
 }
 
-function renderProductos(lista) {
+function renderProductos(lista, ocultarTitulos = false) {
     productosGrid.innerHTML = '';
     emptyMsg.style.display  = lista.length === 0 ? 'block' : 'none';
     if (lista.length === 0) return;
@@ -260,10 +260,12 @@ function renderProductos(lista) {
         seccion.className  = 'categoria-seccion';
         seccion.dataset.cat = cat;
 
-        const titulo = document.createElement('h2');
-        titulo.className   = 'categoria-titulo';
-        titulo.textContent = CATEGORIA_LABELS[cat] || cat;
-        seccion.appendChild(titulo);
+        if (!ocultarTitulos) {
+            const titulo = document.createElement('h2');
+            titulo.className   = 'categoria-titulo';
+            titulo.textContent = CATEGORIA_LABELS[cat] || cat;
+            seccion.appendChild(titulo);
+        }
 
         const grid = document.createElement('div');
         grid.className = 'categoria-grid';
@@ -286,8 +288,8 @@ function iniciarFiltrosCategorias() {
 }
 
 function filtrarPorCategoria(cat) {
-    if (cat === 'todas') { renderProductos(productos); return; }
-    renderProductos(productos.filter(p => (p.categoria || 'Otras') === cat));
+    if (cat === 'todas') { renderProductos(productos, true); return; }
+    renderProductos(productos.filter(p => (p.categoria || 'Otras') === cat), false);
 }
 
 inputBuscar.addEventListener('input', () => {
@@ -295,11 +297,11 @@ inputBuscar.addEventListener('input', () => {
     document.querySelectorAll('.btn-categoria').forEach(b => b.classList.remove('activa'));
     const btnTodas = document.querySelector('.btn-categoria[data-cat="todas"]');
     if (btnTodas) btnTodas.classList.add('activa');
-    if (!term) { renderProductos(productos); return; }
+    if (!term) { renderProductos(productos, true); return; }
     renderProductos(productos.filter(p =>
         p.nombre.toLowerCase().includes(term) ||
         (p['codigoBarras'] && p['codigoBarras'].includes(term))
-    ));
+    ), true);
 });
 
 // ================================================================
