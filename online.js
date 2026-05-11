@@ -609,10 +609,10 @@ async function cargarMisPedidos() {
 
     if (error || !data || data.length === 0) {
         listaMisPedidos.innerHTML = `
-            <div style="text-align:center; padding:40px 20px; color:#aaa;">
-                <div style="font-size:3rem; margin-bottom:12px;">🛍️</div>
-                <p style="font-size:1.05em; font-weight:700; color:#555;">Aún no tienes compras</p>
-                <p style="font-size:0.9em; margin-top:6px;">Cuando hagas tu primer pedido aparecerá aquí.</p>
+            <div class="pedidos-vacio">
+                <div class="pedidos-vacio-icon">🛍️</div>
+                <p class="pedidos-vacio-titulo">Aún no tienes pedidos</p>
+                <p class="pedidos-vacio-sub">Cuando realices tu primera compra, el historial aparecerá aquí.</p>
             </div>`;
         return;
     }
@@ -622,74 +622,165 @@ async function cargarMisPedidos() {
 
     listaMisPedidos.innerHTML = '';
 
-    // Tarjetas resumen en la parte superior
+    // ── Tarjetas de resumen ──────────────────────────────────────
     const resumen = document.createElement('div');
-    resumen.style.cssText = 'display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap;';
+    resumen.className = 'pedidos-resumen-stats';
     resumen.innerHTML = `
-        <div style="flex:1; min-width:120px; background:linear-gradient(135deg,#0c566c,#1a8fa8);
-                    border-radius:12px; padding:14px 16px; color:#fff; text-align:center;">
-            <div style="font-size:1.8em; font-weight:800;">${totalCompras}</div>
-            <div style="font-size:0.82em; opacity:0.88; margin-top:2px;">Pedidos realizados</div>
+        <div class="stat-card stat-card-azul">
+            <div class="stat-num">${totalCompras}</div>
+            <div class="stat-label">Pedidos realizados</div>
         </div>
-        <div style="flex:1; min-width:120px; background:linear-gradient(135deg,#1e7e34,#28a745);
-                    border-radius:12px; padding:14px 16px; color:#fff; text-align:center;">
-            <div style="font-size:1.8em; font-weight:800;">$${totalGastado.toLocaleString('es-CO')}</div>
-            <div style="font-size:0.82em; opacity:0.88; margin-top:2px;">Total en pedidos</div>
+        <div class="stat-card stat-card-verde">
+            <div class="stat-num">$${totalGastado.toLocaleString('es-CO')}</div>
+            <div class="stat-label">Total acumulado</div>
         </div>
     `;
     listaMisPedidos.appendChild(resumen);
 
-    data.forEach(pedido => {
-        const fecha = new Date(pedido.fecha).toLocaleString('es-CO', {
-            year: 'numeric', month: 'short', day: 'numeric',
+    // ── Etiqueta de sección ──────────────────────────────────────
+    const etiqueta = document.createElement('p');
+    etiqueta.className = 'pedidos-seccion-label';
+    etiqueta.textContent = 'Historial de pedidos';
+    listaMisPedidos.appendChild(etiqueta);
+
+    // ── Un acordeón por pedido ───────────────────────────────────
+    data.forEach((pedido, idx) => {
+        const fechaObj  = new Date(pedido.fecha);
+        const fechaDia  = fechaObj.toLocaleDateString('es-CO', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        });
+        const fechaHora = fechaObj.toLocaleTimeString('es-CO', {
             hour: '2-digit', minute: '2-digit'
         });
 
-        const itemsHtml = (pedido.items_pedido || []).map(i =>
-            `<li>
-                <span>${i.cantidad}× ${i.nombre}</span>
-                <span style="font-weight:700; color:var(--primary);">$${Number(i.subtotal).toLocaleString('es-CO')}</span>
-            </li>`
-        ).join('');
+        const items     = pedido.items_pedido || [];
+        const numItems  = items.reduce((s, i) => s + i.cantidad, 0);
 
-        const card = document.createElement('div');
-        card.className = 'pedido-card';
-        card.innerHTML = `
-            <div class="pedido-card-header">
-                <div>
-                    <div class="pedido-num">🛒 Pedido #${pedido.id}</div>
-                    <div class="pedido-fecha">📅 ${fecha}</div>
+        // Filas de la tabla de productos
+        const filasHtml = items.map(i => `
+            <tr>
+                <td class="acc-td-nombre">${i.nombre}</td>
+                <td class="acc-td-cant">${i.cantidad}</td>
+                <td class="acc-td-precio">$${Number(i.precio).toLocaleString('es-CO')}</td>
+                <td class="acc-td-sub">$${Number(i.subtotal).toLocaleString('es-CO')}</td>
+            </tr>
+        `).join('');
+
+        const acordeon = document.createElement('div');
+        acordeon.className = 'acordeon-pedido';
+        if (idx === 0) acordeon.classList.add('acordeon-primero');
+
+        acordeon.innerHTML = `
+            <button class="acordeon-trigger" aria-expanded="false">
+                <div class="acordeon-trigger-izq">
+                    <span class="acordeon-icono-bolsa">🛒</span>
+                    <div class="acordeon-trigger-info">
+                        <span class="acordeon-num">Pedido #${pedido.id}</span>
+                        <span class="acordeon-meta">
+                            <span class="acordeon-fecha-dia">${fechaDia}</span>
+                            <span class="acordeon-sep">·</span>
+                            <span class="acordeon-hora">🕐 ${fechaHora}</span>
+                            <span class="acordeon-sep">·</span>
+                            <span class="acordeon-cant-items">${numItems} producto${numItems !== 1 ? 's' : ''}</span>
+                        </span>
+                    </div>
                 </div>
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <div class="pedido-total-header">$${Number(pedido.total).toLocaleString('es-CO')}</div>
-                    <span style="font-size:0.8em; color:#999;">▼</span>
+                <div class="acordeon-trigger-der">
+                    <span class="acordeon-total">$${Number(pedido.total).toLocaleString('es-CO')}</span>
+                    <span class="acordeon-chevron">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </span>
                 </div>
-            </div>
-            <div class="pedido-card-body">
-                <ul>${itemsHtml}</ul>
-                <div class="pedido-info-extra">
-                    📍 ${pedido.direccion || '—'}
-                    ${pedido.notas ? '<br>📝 <em>' + pedido.notas + '</em>' : ''}
-                </div>
-                <div style="font-size:0.92em; font-weight:800; text-align:right; margin-top:12px;
-                            padding-top:10px; border-top:2px solid var(--accent); color:var(--primary);">
-                    Total: $${Number(pedido.total).toLocaleString('es-CO')}
+            </button>
+
+            <div class="acordeon-panel" role="region">
+                <div class="acordeon-panel-inner">
+
+                    <!-- Tabla de productos -->
+                    <div class="acc-tabla-wrap">
+                        <table class="acc-tabla">
+                            <thead>
+                                <tr>
+                                    <th class="acc-th-nombre">Producto</th>
+                                    <th class="acc-th-cant">Cant.</th>
+                                    <th class="acc-th-precio">Precio u.</th>
+                                    <th class="acc-th-sub">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>${filasHtml}</tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="3" class="acc-tfoot-label">Total del pedido</td>
+                                    <td class="acc-tfoot-total">$${Number(pedido.total).toLocaleString('es-CO')}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    <!-- Datos de entrega -->
+                    <div class="acc-entrega">
+                        <div class="acc-entrega-fila">
+                            <span class="acc-entrega-icon">📍</span>
+                            <span class="acc-entrega-txt">${pedido.direccion || 'Sin dirección registrada'}</span>
+                        </div>
+                        ${pedido.notas ? `
+                        <div class="acc-entrega-fila">
+                            <span class="acc-entrega-icon">📝</span>
+                            <span class="acc-entrega-txt"><em>${pedido.notas}</em></span>
+                        </div>` : ''}
+                        <div class="acc-entrega-fila">
+                            <span class="acc-entrega-icon">💵</span>
+                            <span class="acc-entrega-txt">Pago contra entrega</span>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         `;
 
-        const header = card.querySelector('.pedido-card-header');
-        const body   = card.querySelector('.pedido-card-body');
-        const arrow  = header.querySelector('span[style*="color:#999"]');
+        // ── Lógica acordeón con animación de altura ──────────────
+        const trigger = acordeon.querySelector('.acordeon-trigger');
+        const panel   = acordeon.querySelector('.acordeon-panel');
+        const chevron = acordeon.querySelector('.acordeon-chevron');
 
-        header.style.cursor = 'pointer';
-        header.addEventListener('click', () => {
-            const abierto = body.style.display === 'block';
-            body.style.display = abierto ? 'none' : 'block';
-            if (arrow) arrow.textContent = abierto ? '▼' : '▲';
+        trigger.addEventListener('click', () => {
+            const expandido = trigger.getAttribute('aria-expanded') === 'true';
+
+            if (expandido) {
+                // Cerrar: animar hacia 0
+                panel.style.height = panel.scrollHeight + 'px';
+                requestAnimationFrame(() => {
+                    panel.style.height = '0px';
+                    panel.style.opacity = '0';
+                });
+                trigger.setAttribute('aria-expanded', 'false');
+                acordeon.classList.remove('abierto');
+            } else {
+                // Abrir: animar desde 0 hasta scrollHeight
+                panel.style.height = '0px';
+                panel.style.opacity = '0';
+                panel.style.display = 'block';
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        panel.style.height  = panel.scrollHeight + 'px';
+                        panel.style.opacity = '1';
+                    });
+                });
+                trigger.setAttribute('aria-expanded', 'true');
+                acordeon.classList.add('abierto');
+
+                // Al terminar la transición, liberar la altura para que sea flexible
+                panel.addEventListener('transitionend', () => {
+                    if (acordeon.classList.contains('abierto')) {
+                        panel.style.height = 'auto';
+                    }
+                }, { once: true });
+            }
         });
 
-        listaMisPedidos.appendChild(card);
+        listaMisPedidos.appendChild(acordeon);
     });
 }
 

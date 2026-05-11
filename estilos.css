@@ -888,71 +888,287 @@ body {
 .btn-confirmar-pedido:disabled { background: #aaa; cursor: not-allowed; transform: none; }
 
 /* ================================================================
-   MIS PEDIDOS
+   MIS PEDIDOS — Acordeón
 ================================================================ */
 .lista-pedidos-cliente {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  max-height: 60vh;
+  gap: 0;
+  max-height: 72vh;
   overflow-y: auto;
-  padding-right: 4px;
+  padding-right: 2px;
+  padding-bottom: 8px;
 }
 
-.pedido-card {
-  border: 2px solid #eee;
-  border-radius: 12px;
-  overflow: hidden;
+/* ── Estado vacío ─────────────────────────────────────────────── */
+.pedidos-vacio {
+  text-align: center;
+  padding: 50px 20px 30px;
+  color: #aaa;
 }
 
-.pedido-card-header {
+.pedidos-vacio-icon   { font-size: 3.2rem; margin-bottom: 14px; }
+.pedidos-vacio-titulo { font-size: 1.1em; font-weight: 800; color: #555; margin-bottom: 6px; }
+.pedidos-vacio-sub    { font-size: 0.88em; color: #aaa; line-height: 1.6; }
+
+/* ── Tarjetas de estadísticas ─────────────────────────────────── */
+.pedidos-resumen-stats {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 16px;
-  background: var(--bg);
-  cursor: pointer;
-  gap: 10px;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
-.pedido-card-header:hover { background: #e8eef0; }
+.stat-card {
+  flex: 1;
+  min-width: 120px;
+  border-radius: 14px;
+  padding: 16px 18px;
+  color: #fff;
+  text-align: center;
+}
 
-.pedido-num { font-weight: 800; color: var(--primary); }
-.pedido-fecha { font-size: 0.82em; color: var(--text-soft); }
-.pedido-total-header { font-weight: 800; color: var(--primary); white-space: nowrap; }
+.stat-card-azul  { background: linear-gradient(135deg, #0c566c, #1a8fa8); }
+.stat-card-verde { background: linear-gradient(135deg, #1e7e34, #28a745); }
 
-.pedido-estado {
+.stat-num   { font-size: 1.9em; font-weight: 800; line-height: 1.1; }
+.stat-label { font-size: 0.8em; opacity: 0.88; margin-top: 4px; }
+
+/* ── Etiqueta de sección ─────────────────────────────────────── */
+.pedidos-seccion-label {
   font-size: 0.78em;
   font-weight: 800;
-  padding: 4px 10px;
-  border-radius: 50px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-soft);
+  margin-bottom: 10px;
+}
+
+/* ── Acordeón individual ──────────────────────────────────────── */
+.acordeon-pedido {
+  border: 2px solid #e4ecef;
+  border-radius: 14px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  transition: border-color 0.25s, box-shadow 0.25s;
+  background: #fff;
+}
+
+.acordeon-pedido:hover {
+  border-color: var(--accent-dk);
+  box-shadow: 0 4px 18px rgba(12,86,108,0.09);
+}
+
+.acordeon-pedido.abierto {
+  border-color: var(--primary);
+  box-shadow: 0 6px 24px rgba(12,86,108,0.13);
+}
+
+/* ── Botón trigger ────────────────────────────────────────────── */
+.acordeon-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  background: var(--bg);
+  border: none;
+  cursor: pointer;
+  font-family: 'Nunito', sans-serif;
+  text-align: left;
+  transition: background 0.2s;
+}
+
+.acordeon-pedido.abierto .acordeon-trigger { background: #e6f2f6; }
+.acordeon-trigger:hover { background: #deedf2; }
+
+.acordeon-trigger-izq {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.acordeon-icono-bolsa { font-size: 1.5em; flex-shrink: 0; }
+
+.acordeon-trigger-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.acordeon-num {
+  font-weight: 800;
+  font-size: 0.97em;
+  color: var(--primary);
+}
+
+.acordeon-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78em;
+  color: var(--text-soft);
+}
+
+.acordeon-fecha-dia { font-weight: 700; color: var(--text); }
+.acordeon-hora      { font-weight: 600; }
+.acordeon-cant-items { font-weight: 600; color: var(--accent-dk); }
+.acordeon-sep       { color: #ccc; }
+
+.acordeon-trigger-der {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.acordeon-total {
+  font-weight: 800;
+  font-size: 1.05em;
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+.acordeon-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(12,86,108,0.08);
+  color: var(--primary);
+  transition: transform 0.3s ease, background 0.2s;
+  flex-shrink: 0;
+}
+
+.acordeon-pedido.abierto .acordeon-chevron {
+  transform: rotate(180deg);
+  background: var(--primary);
+  color: var(--accent);
+}
+
+/* ── Panel expandible ─────────────────────────────────────────── */
+.acordeon-panel {
+  display: none;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: height 0.32s cubic-bezier(0.4,0,0.2,1),
+              opacity 0.28s ease;
+}
+
+.acordeon-panel-inner {
+  padding: 18px 18px 20px;
+  border-top: 1px dashed #d8e8ed;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Tabla de productos ───────────────────────────────────────── */
+.acc-tabla-wrap {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid #e4ecef;
+}
+
+.acc-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88em;
+}
+
+.acc-tabla thead tr {
+  background: var(--primary);
+}
+
+.acc-tabla th {
+  color: var(--accent);
+  padding: 9px 12px;
+  font-size: 0.8em;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 
-.estado-pendiente       { background: #fff3cd; color: #856404; }
-.estado-pagado          { background: #d1e7dd; color: #0f5132; }
-.estado-entregado       { background: #cff4fc; color: #055160; }
-.estado-cancelado       { background: #f8d7da; color: #842029; }
-.estado-esperando_pago  { background: #e2d9f3; color: #432874; }
+.acc-tabla td {
+  padding: 9px 12px;
+  border-bottom: 1px solid #f0f5f7;
+  color: var(--text);
+  vertical-align: middle;
+}
 
-.pedido-card-body {
-  display: none;
-  padding: 14px 16px;
-  background: #fff;
-  border-top: 1px dashed #ddd;
+.acc-tabla tbody tr:last-child td { border-bottom: none; }
+.acc-tabla tbody tr:hover { background: #f5fafc; }
+
+.acc-th-nombre, .acc-td-nombre { text-align: left; }
+.acc-th-cant,   .acc-td-cant   { text-align: center; }
+.acc-th-precio, .acc-td-precio { text-align: right; }
+.acc-th-sub,    .acc-td-sub    { text-align: right; }
+
+.acc-td-nombre { font-weight: 700; }
+.acc-td-cant   { font-weight: 700; color: var(--primary); }
+.acc-td-sub    { font-weight: 800; color: var(--primary); }
+
+/* Pie de tabla (total) */
+.acc-tabla tfoot tr { background: #eaf4f7; }
+
+.acc-tfoot-label {
+  font-weight: 800;
+  color: var(--primary);
   font-size: 0.9em;
+  padding: 10px 12px;
 }
 
-.pedido-card-body ul { list-style: none; padding: 0; margin: 0 0 10px; }
-.pedido-card-body li {
+.acc-tfoot-total {
+  font-weight: 800;
+  color: var(--primary);
+  font-size: 1em;
+  text-align: right;
+  padding: 10px 12px;
+  border-top: 2px solid var(--accent);
+}
+
+/* ── Datos de entrega ─────────────────────────────────────────── */
+.acc-entrega {
   display: flex;
-  justify-content: space-between;
-  padding: 5px 0;
-  border-bottom: 1px solid #f0f0f0;
+  flex-direction: column;
+  gap: 8px;
+  background: #f5fafc;
+  border-radius: 10px;
+  padding: 12px 14px;
+  border: 1px solid #e4ecef;
 }
 
-.pedido-info-extra { color: var(--text-soft); font-size: 0.88em; line-height: 1.8; }
+.acc-entrega-fila {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.88em;
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+
+.acc-entrega-icon { flex-shrink: 0; font-size: 1em; }
+.acc-entrega-txt  { flex: 1; }
+
+/* ── Responsive ───────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .acordeon-trigger       { padding: 13px 14px; gap: 8px; }
+  .acordeon-icono-bolsa   { font-size: 1.25em; }
+  .acordeon-meta          { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .acordeon-sep           { display: none; }
+  .acordeon-total         { font-size: 0.95em; }
+  .acc-tabla th, .acc-tabla td { padding: 7px 8px; font-size: 0.82em; }
+  .acordeon-panel-inner   { padding: 14px 12px 16px; }
+}
 
 /* ================================================================
    ANIMACIONES
