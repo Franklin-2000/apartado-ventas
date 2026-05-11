@@ -503,67 +503,29 @@ body {
 .tarjeta-stock.agotado { color: var(--danger); font-weight: 700; }
 
 /* ----------------------------------------------------------------
-   CONTROLES DE CANTIDAD — en la tarjeta
+   CONTROLES DE CANTIDAD — solo input manual, sin botones
 ---------------------------------------------------------------- */
 .tarjeta-cantidad-controles {
-  display: flex;
-  align-items: center;
-  gap: 0;
   margin: 8px 14px 4px;
-  border: 2px solid #ddd;
-  border-radius: 10px;
-  overflow: hidden;
-  background: var(--bg);
-}
-
-.btn-qty-card {
-  width: 38px;
-  height: 38px;
-  background: var(--primary);
-  color: var(--accent);
-  border: none;
-  font-size: 1.3em;
-  font-weight: 800;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s, transform 0.1s;
-  flex-shrink: 0;
-  line-height: 1;
-  user-select: none;
-}
-
-.btn-qty-card:hover:not(:disabled) {
-  background: var(--primary-lt);
-}
-
-.btn-qty-card:active:not(:disabled) {
-  transform: scale(0.92);
-}
-
-.btn-qty-card:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-  color: #888;
 }
 
 .input-qty-card {
-  flex: 1;
-  min-width: 0;
-  height: 38px;
-  border: none;
-  border-left: 2px solid #ddd;
-  border-right: 2px solid #ddd;
+  width: 100%;
+  height: 42px;
+  border: 2px solid #ddd;
+  border-radius: 10px;
   text-align: center;
   font-size: 1em;
-  font-weight: 800;
+  font-weight: 700;
   font-family: 'Nunito', sans-serif;
   color: var(--text);
   background: #fff;
   outline: none;
-  padding: 0 4px;
+  padding: 0 12px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  /* Ocultar flechas en todos los navegadores */
   -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 .input-qty-card::-webkit-outer-spin-button,
@@ -572,7 +534,15 @@ body {
   margin: 0;
 }
 
+.input-qty-card::placeholder {
+  color: #aaa;
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
 .input-qty-card:focus {
+  border-color: var(--accent-dk);
+  box-shadow: 0 0 0 3px rgba(72,164,170,0.18);
   background: #f0fafa;
 }
 

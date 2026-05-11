@@ -251,9 +251,7 @@ function crearTarjetaProducto(p, idx) {
             </div>
         </div>
         <div class="tarjeta-cantidad-controles" ${agotado ? 'style="opacity:0.4;pointer-events:none"' : ''}>
-            <button class="btn-qty-card btn-qty-bajar" title="Restar" ${agotado ? 'disabled' : ''}>−</button>
-            <input  class="input-qty-card" type="number" value="1" min="1" max="${p.cantidad}" ${agotado ? 'disabled' : ''}>
-            <button class="btn-qty-card btn-qty-subir" title="Sumar"  ${agotado ? 'disabled' : ''}>+</button>
+            <input class="input-qty-card" type="number" placeholder="Cantidad: 1" min="1" max="${p.cantidad}" inputmode="numeric" pattern="[0-9]*" ${agotado ? 'disabled' : ''}>
         </div>
         <button class="btn-agregar" ${agotado ? 'disabled' : ''}>
             ${agotado ? 'Agotado' : '🛒 Agregar al carrito'}
@@ -262,51 +260,47 @@ function crearTarjetaProducto(p, idx) {
 
     if (!agotado) {
         const inputQty   = card.querySelector('.input-qty-card');
-        const btnBajar   = card.querySelector('.btn-qty-bajar');
-        const btnSubir   = card.querySelector('.btn-qty-subir');
         const btnAgregar = card.querySelector('.btn-agregar');
 
-        btnSubir.addEventListener('click', () => {
-            let v = parseInt(inputQty.value) || 1;
-            if (v < p.cantidad) inputQty.value = v + 1;
-        });
-        btnBajar.addEventListener('click', () => {
-            let v = parseInt(inputQty.value) || 1;
-            if (v > 1) inputQty.value = v - 1;
-        });
-        // Seleccionar todo al hacer foco (desktop y móvil)
-        inputQty.addEventListener('focus', () => {
-            inputQty.select();
-        });
-        inputQty.addEventListener('click', () => {
-            setTimeout(() => inputQty.select(), 0);
-        });
+        // Al hacer foco/click seleccionar el contenido para reemplazar fácilmente
+        inputQty.addEventListener('focus', () => { inputQty.select(); });
+        inputQty.addEventListener('click', () => { setTimeout(() => inputQty.select(), 0); });
+
+        // En movil: foco limpio al tocar
         inputQty.addEventListener('touchend', (e) => {
             e.preventDefault();
             inputQty.focus();
             setTimeout(() => inputQty.select(), 50);
         });
+
+        // Validar mientras escribe: solo numeros, maximo stock disponible
         inputQty.addEventListener('input', () => {
-            let v = parseInt(inputQty.value);
-            if (isNaN(v) || v < 1)        inputQty.value = 1;
-            else if (v > p.cantidad)       inputQty.value = p.cantidad;
+            inputQty.value = inputQty.value.replace(/[^0-9]/g, '');
+            const v = parseInt(inputQty.value);
+            if (v > p.cantidad) inputQty.value = p.cantidad;
         });
+
+        // Al salir del campo: si quedo vacio o 0, limpiar para mostrar placeholder
         inputQty.addEventListener('blur', () => {
-            if (!inputQty.value || parseInt(inputQty.value) < 1) inputQty.value = 1;
+            const v = parseInt(inputQty.value);
+            if (inputQty.value !== '' && (isNaN(v) || v < 1)) inputQty.value = '';
         });
-        // Enter agrega al carrito automáticamente
+
+        // Enter agrega al carrito con cantidad ingresada (o 1 si esta vacio)
         inputQty.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 const qty = parseInt(inputQty.value) || 1;
                 agregarAlCarritoConQty(p, qty);
-                inputQty.value = 1;
+                inputQty.value = '';
+                inputQty.blur();
             }
         });
+
         btnAgregar.addEventListener('click', () => {
             const qty = parseInt(inputQty.value) || 1;
             agregarAlCarritoConQty(p, qty);
-            inputQty.value = 1;
+            inputQty.value = '';
         });
     }
 
@@ -607,8 +601,8 @@ async function cargarMisPedidos() {
     const { data, error } = await sb
         .from('pedidos')
         .select(`
-            id, total, fecha, direccion, notas,
-            items_pedido (nombre, cantidad, subtotal)
+            id, total, fecha, direccion, notas, cliente_nombre,
+            items_pedido (nombre, cantidad, precio, subtotal)
         `)
         .eq('user_id', currentUser.id)
         .order('id', { ascending: false });
@@ -628,13 +622,14 @@ async function cargarMisPedidos() {
 
     listaMisPedidos.innerHTML = '';
 
+    // Tarjetas resumen en la parte superior
     const resumen = document.createElement('div');
     resumen.style.cssText = 'display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap;';
     resumen.innerHTML = `
         <div style="flex:1; min-width:120px; background:linear-gradient(135deg,#0c566c,#1a8fa8);
                     border-radius:12px; padding:14px 16px; color:#fff; text-align:center;">
             <div style="font-size:1.8em; font-weight:800;">${totalCompras}</div>
-            <div style="font-size:0.82em; opacity:0.88; margin-top:2px;">Compras realizadas</div>
+            <div style="font-size:0.82em; opacity:0.88; margin-top:2px;">Pedidos realizados</div>
         </div>
         <div style="flex:1; min-width:120px; background:linear-gradient(135deg,#1e7e34,#28a745);
                     border-radius:12px; padding:14px 16px; color:#fff; text-align:center;">
@@ -650,6 +645,13 @@ async function cargarMisPedidos() {
             hour: '2-digit', minute: '2-digit'
         });
 
+        const itemsHtml = (pedido.items_pedido || []).map(i =>
+            `<li>
+                <span>${i.cantidad}× ${i.nombre}</span>
+                <span style="font-weight:700; color:var(--primary);">$${Number(i.subtotal).toLocaleString('es-CO')}</span>
+            </li>`
+        ).join('');
+
         const card = document.createElement('div');
         card.className = 'pedido-card';
         card.innerHTML = `
@@ -658,28 +660,33 @@ async function cargarMisPedidos() {
                     <div class="pedido-num">🛒 Pedido #${pedido.id}</div>
                     <div class="pedido-fecha">📅 ${fecha}</div>
                 </div>
-                <div class="pedido-total-header">$${Number(pedido.total).toLocaleString('es-CO')}</div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div class="pedido-total-header">$${Number(pedido.total).toLocaleString('es-CO')}</div>
+                    <span style="font-size:0.8em; color:#999;">▼</span>
+                </div>
             </div>
             <div class="pedido-card-body">
-                <ul>
-                    ${pedido.items_pedido.map(i =>
-                        '<li><span>' + i.cantidad + 'x ' + i.nombre + '</span><span>$' + Number(i.subtotal).toLocaleString('es-CO') + '</span></li>'
-                    ).join('')}
-                </ul>
+                <ul>${itemsHtml}</ul>
                 <div class="pedido-info-extra">
                     📍 ${pedido.direccion || '—'}
                     ${pedido.notas ? '<br>📝 <em>' + pedido.notas + '</em>' : ''}
                 </div>
-                <div style="font-size:0.85em; font-weight:700; text-align:right; margin-top:10px; color:#0c566c;">
+                <div style="font-size:0.92em; font-weight:800; text-align:right; margin-top:12px;
+                            padding-top:10px; border-top:2px solid var(--accent); color:var(--primary);">
                     Total: $${Number(pedido.total).toLocaleString('es-CO')}
                 </div>
             </div>
         `;
 
-        card.querySelector('.pedido-card-header').style.cursor = 'pointer';
-        card.querySelector('.pedido-card-header').addEventListener('click', () => {
-            const body = card.querySelector('.pedido-card-body');
-            body.style.display = body.style.display === 'block' ? 'none' : 'block';
+        const header = card.querySelector('.pedido-card-header');
+        const body   = card.querySelector('.pedido-card-body');
+        const arrow  = header.querySelector('span[style*="color:#999"]');
+
+        header.style.cursor = 'pointer';
+        header.addEventListener('click', () => {
+            const abierto = body.style.display === 'block';
+            body.style.display = abierto ? 'none' : 'block';
+            if (arrow) arrow.textContent = abierto ? '▼' : '▲';
         });
 
         listaMisPedidos.appendChild(card);
