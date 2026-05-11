@@ -607,56 +607,76 @@ async function cargarMisPedidos() {
     const { data, error } = await sb
         .from('pedidos')
         .select(`
-            id, estado, total, metodo_pago, fecha, direccion, notas,
-            items_pedido (nombre, cantidad, precio, subtotal)
+            id, total, fecha, direccion, notas,
+            items_pedido (nombre, cantidad, subtotal)
         `)
         .eq('user_id', currentUser.id)
         .order('id', { ascending: false });
 
     if (error || !data || data.length === 0) {
-        listaMisPedidos.innerHTML = '<p style="color:#888; text-align:center; padding:20px;">Aún no tienes pedidos.</p>';
+        listaMisPedidos.innerHTML = `
+            <div style="text-align:center; padding:40px 20px; color:#aaa;">
+                <div style="font-size:3rem; margin-bottom:12px;">🛍️</div>
+                <p style="font-size:1.05em; font-weight:700; color:#555;">Aún no tienes compras</p>
+                <p style="font-size:0.9em; margin-top:6px;">Cuando hagas tu primer pedido aparecerá aquí.</p>
+            </div>`;
         return;
     }
 
+    const totalCompras = data.length;
+    const totalGastado = data.reduce((s, p) => s + Number(p.total), 0);
+
     listaMisPedidos.innerHTML = '';
 
-    const etiquetaEstado = {
-        pendiente:       { texto: '⏳ Pendiente — contra entrega', clase: 'estado-pendiente'  },
-        pago_confirmado: { texto: '✅ Pago confirmado',            clase: 'estado-pagado'     },
-        despachado:      { texto: '🚚 En camino',                  clase: 'estado-despachado' },
-        entregado:       { texto: '📦 Entregado',                  clase: 'estado-entregado'  },
-        cancelado:       { texto: '🚫 Cancelado',                  clase: 'estado-cancelado'  },
-    };
+    const resumen = document.createElement('div');
+    resumen.style.cssText = 'display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap;';
+    resumen.innerHTML = `
+        <div style="flex:1; min-width:120px; background:linear-gradient(135deg,#0c566c,#1a8fa8);
+                    border-radius:12px; padding:14px 16px; color:#fff; text-align:center;">
+            <div style="font-size:1.8em; font-weight:800;">${totalCompras}</div>
+            <div style="font-size:0.82em; opacity:0.88; margin-top:2px;">Compras realizadas</div>
+        </div>
+        <div style="flex:1; min-width:120px; background:linear-gradient(135deg,#1e7e34,#28a745);
+                    border-radius:12px; padding:14px 16px; color:#fff; text-align:center;">
+            <div style="font-size:1.8em; font-weight:800;">$${totalGastado.toLocaleString('es-CO')}</div>
+            <div style="font-size:0.82em; opacity:0.88; margin-top:2px;">Total en pedidos</div>
+        </div>
+    `;
+    listaMisPedidos.appendChild(resumen);
 
     data.forEach(pedido => {
-        const fecha = new Date(pedido.fecha).toLocaleString('es-CO');
-        const etq   = etiquetaEstado[pedido.estado] || { texto: pedido.estado, clase: '' };
+        const fecha = new Date(pedido.fecha).toLocaleString('es-CO', {
+            year: 'numeric', month: 'short', day: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+        });
 
         const card = document.createElement('div');
         card.className = 'pedido-card';
         card.innerHTML = `
             <div class="pedido-card-header">
                 <div>
-                    <div class="pedido-num">Pedido #${pedido.id}</div>
-                    <div class="pedido-fecha">${fecha}</div>
+                    <div class="pedido-num">🛒 Pedido #${pedido.id}</div>
+                    <div class="pedido-fecha">📅 ${fecha}</div>
                 </div>
-                <span class="pedido-estado ${etq.clase}">${etq.texto}</span>
                 <div class="pedido-total-header">$${Number(pedido.total).toLocaleString('es-CO')}</div>
             </div>
             <div class="pedido-card-body">
                 <ul>
                     ${pedido.items_pedido.map(i =>
-                        `<li><span>${i.cantidad}x ${i.nombre}</span><span>$${Number(i.subtotal).toLocaleString('es-CO')}</span></li>`
+                        '<li><span>' + i.cantidad + 'x ' + i.nombre + '</span><span>$' + Number(i.subtotal).toLocaleString('es-CO') + '</span></li>'
                     ).join('')}
                 </ul>
                 <div class="pedido-info-extra">
-                    📍 ${pedido.direccion || '—'}<br>
-                    💵 Contra entrega
-                    ${pedido.notas ? `<br>📝 ${pedido.notas}` : ''}
+                    📍 ${pedido.direccion || '—'}
+                    ${pedido.notas ? '<br>📝 <em>' + pedido.notas + '</em>' : ''}
+                </div>
+                <div style="font-size:0.85em; font-weight:700; text-align:right; margin-top:10px; color:#0c566c;">
+                    Total: $${Number(pedido.total).toLocaleString('es-CO')}
                 </div>
             </div>
         `;
 
+        card.querySelector('.pedido-card-header').style.cursor = 'pointer';
         card.querySelector('.pedido-card-header').addEventListener('click', () => {
             const body = card.querySelector('.pedido-card-body');
             body.style.display = body.style.display === 'block' ? 'none' : 'block';
