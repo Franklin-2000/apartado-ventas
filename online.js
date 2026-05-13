@@ -162,7 +162,7 @@ async function mostrarTienda() {
 btnGoogle.addEventListener('click', async () => {
     await sb.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: window.location.href }
+        options: { redirectTo: 'https://franklin-2000.github.io/apartado-ventas/' }
     });
 });
 
