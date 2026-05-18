@@ -416,10 +416,19 @@ function crearTarjetaCombo(combo, idx) {
     const prods  = combo.combo_productos || [];
     const imgSrc = combo.imagen || 'https://via.placeholder.com/300x200?text=Combo';
 
-    const productosHtml = prods.map(cp => {
-        const p = cp.productos || {};
-        return `<span class="combo-incluye-item">• ${p.nombre || 'Producto'} ×${cp.cantidad}</span>`;
-    }).join('');
+    const productosHtml = prods.length > 0
+        ? prods.map(cp => {
+            const p   = cp.productos || {};
+            const img = p.imagen || '';
+            return `
+                <div class="combo-prod-mini">
+                    ${img
+                        ? `<img src="${img}" alt="${p.nombre || ''}" onerror="this.src='https://via.placeholder.com/60?text=P'">`
+                        : `<div class="combo-prod-mini-placeholder">📦</div>`}
+                    <span class="combo-prod-mini-label">${cp.cantidad}u. ${p.nombre || 'Producto'}</span>
+                </div>`;
+        }).join('')
+        : '<span class="combo-incluye-item">Ver detalles del combo</span>';
 
     card.innerHTML = `
         <div class="tarjeta-img-wrapper">
@@ -429,7 +438,7 @@ function crearTarjetaCombo(combo, idx) {
         </div>
         <div class="tarjeta-info">
             <div class="tarjeta-nombre">${combo.nombre}</div>
-            <div class="combo-incluye-lista">${productosHtml || '<span class="combo-incluye-item">Ver detalles</span>'}</div>
+            <div class="combo-prods-grid">${productosHtml}</div>
             <div class="tarjeta-precio">$${precio.toLocaleString('es-CO')}</div>
         </div>
         <div class="tarjeta-cantidad-controles">

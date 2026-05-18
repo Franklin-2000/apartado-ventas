@@ -1219,11 +1219,51 @@ body {
   letter-spacing: 0.5px;
 }
 
-.combo-incluye-lista {
+.combo-prods-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 8px;
+  background: rgba(12,86,108,0.05);
+  border-radius: 10px;
+}
+
+.combo-prod-mini {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin: 4px 0 6px;
+  align-items: center;
+  gap: 4px;
+  width: 62px;
+}
+
+.combo-prod-mini img {
+  width: 54px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 9px;
+  border: 2px solid rgba(12,86,108,0.18);
+}
+
+.combo-prod-mini-placeholder {
+  width: 54px;
+  height: 54px;
+  border-radius: 9px;
+  border: 2px solid rgba(12,86,108,0.18);
+  background: rgba(12,86,108,0.07);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+}
+
+.combo-prod-mini-label {
+  font-size: 0.67em;
+  font-weight: 700;
+  color: var(--text-soft);
+  text-align: center;
+  line-height: 1.2;
+  word-break: break-word;
 }
 
 .combo-incluye-item {
