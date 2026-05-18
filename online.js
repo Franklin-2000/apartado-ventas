@@ -374,35 +374,17 @@ function filtrarPorCategoria(cat) {
 // ================================================================
 async function cargarCombos() {
     if (!adminUserId) return;
-
-    // Primero intentar con join completo
+    // combo_productos ya tiene nombre, imagen y precio guardados directamente.
+    // No hay FK entre product_id (TEXT) y productos.id (BIGINT), así que no se hace join.
     const { data, error } = await sb
         .from('combos')
         .select(`
             *,
-            combo_productos (
-                cantidad,
-                productos ( id, nombre, precio, imagen )
-            )
+            combo_productos ( id, product_id, nombre, precio, imagen, cantidad )
         `)
         .eq('user_id', adminUserId)
         .order('nombre', { ascending: true });
-
-    if (error) {
-        console.error('Error cargando combos (join):', error);
-        // Fallback: cargar combos sin join (solo datos básicos)
-        const { data: data2, error: error2 } = await sb
-            .from('combos')
-            .select('*')
-            .eq('user_id', adminUserId)
-            .order('nombre', { ascending: true });
-        if (error2) {
-            console.error('Error cargando combos (básico):', error2);
-            return;
-        }
-        combos = (data2 || []).map(c => ({ ...c, combo_productos: [] }));
-        return;
-    }
+    if (error) { console.error('Error cargando combos:', error); return; }
     combos = data || [];
 }
 
@@ -418,14 +400,14 @@ function crearTarjetaCombo(combo, idx) {
 
     const productosHtml = prods.length > 0
         ? prods.map(cp => {
-            const p   = cp.productos || {};
-            const img = p.imagen || '';
+            const img    = cp.imagen || '';
+            const nombre = cp.nombre || 'Producto';
             return `
                 <div class="combo-prod-mini">
                     ${img
-                        ? `<img src="${img}" alt="${p.nombre || ''}" onerror="this.src='https://via.placeholder.com/60?text=P'">`
+                        ? `<img src="${img}" alt="${nombre}" onerror="this.src='https://via.placeholder.com/60?text=P'">`
                         : `<div class="combo-prod-mini-placeholder">📦</div>`}
-                    <span class="combo-prod-mini-label">${cp.cantidad}u. ${p.nombre || 'Producto'}</span>
+                    <span class="combo-prod-mini-label">${cp.cantidad}u. ${nombre}</span>
                 </div>`;
         }).join('')
         : '<span class="combo-incluye-item">Ver detalles del combo</span>';
