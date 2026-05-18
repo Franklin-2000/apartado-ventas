@@ -22,7 +22,8 @@ let currentUser  = null;
 let esAdmin      = false;
 let adminUserId  = null;   // user_id de la cuenta admin (se carga al iniciar)
 let productos    = [];
-let carrito      = [];     // [{ producto, qty }]
+let carrito      = [];     // [{ producto, qty }] o [{ combo, qty }]
+let combos       = [];
 
 // ================================================================
 // DOM
@@ -156,7 +157,13 @@ async function mostrarTienda() {
     pantLogin.style.display  = 'none';
     pantTienda.style.display = 'block';
 
-    await cargarProductos();
+    await Promise.all([cargarProductos(), cargarCombos()]);
+    if (productos.length === 0 && combos.length === 0) {
+        emptyMsg.style.display = 'block';
+        return;
+    }
+    renderTodas();
+    iniciarFiltrosCategorias();
 }
 
 btnGoogle.addEventListener('click', async () => {
@@ -209,9 +216,6 @@ async function cargarProductos() {
     }
 
     productos = data || [];
-    if (productos.length === 0) { emptyMsg.style.display = 'block'; return; }
-    renderProductos(productos, true);   // Vista "Todas": sin títulos de categoría
-    iniciarFiltrosCategorias();
 }
 
 // Etiquetas y emojis por categoría
@@ -360,8 +364,174 @@ function iniciarFiltrosCategorias() {
 }
 
 function filtrarPorCategoria(cat) {
-    if (cat === 'todas') { renderProductos(productos, true); return; }
+    if (cat === 'todas')   { renderTodas(); return; }
+    if (cat === 'combos')  { renderSoloCombos(); return; }
     renderProductos(productos.filter(p => (p.categoria || 'Otras') === cat), false);
+}
+
+// ================================================================
+// COMBOS — carga, renderizado y carrito
+// ================================================================
+async function cargarCombos() {
+    if (!adminUserId) return;
+    const { data, error } = await sb
+        .from('combos')
+        .select(`
+            *,
+            combo_productos (
+                cantidad,
+                productos ( id, nombre, precio, imagen )
+            )
+        `)
+        .eq('user_id', adminUserId)
+        .order('nombre', { ascending: true });
+    if (error) { console.error('Error cargando combos:', error); return; }
+    combos = data || [];
+}
+
+function crearTarjetaCombo(combo, idx) {
+    const card = document.createElement('div');
+    card.className = 'tarjeta-tienda tarjeta-combo';
+    card.style.animationDelay = `${idx * 0.04}s`;
+    card.dataset.comboId = combo.id;
+
+    const precio = Number(combo.precio || combo.precio_total || 0);
+    const prods  = combo.combo_productos || [];
+    const imgSrc = combo.imagen || 'https://via.placeholder.com/300x200?text=Combo';
+
+    const productosHtml = prods.map(cp => {
+        const p = cp.productos || {};
+        return `<span class="combo-incluye-item">• ${p.nombre || 'Producto'} ×${cp.cantidad}</span>`;
+    }).join('');
+
+    card.innerHTML = `
+        <div class="tarjeta-img-wrapper">
+            <img src="${imgSrc}" alt="${combo.nombre}"
+                 onerror="this.src='https://via.placeholder.com/300x200?text=Combo'">
+            <span class="badge-combo">🎁 COMBO</span>
+        </div>
+        <div class="tarjeta-info">
+            <div class="tarjeta-nombre">${combo.nombre}</div>
+            <div class="combo-incluye-lista">${productosHtml || '<span class="combo-incluye-item">Ver detalles</span>'}</div>
+            <div class="tarjeta-precio">$${precio.toLocaleString('es-CO')}</div>
+        </div>
+        <div class="tarjeta-cantidad-controles">
+            <input class="input-qty-card" type="number" placeholder="Cantidad: 1" min="1" inputmode="numeric" pattern="[0-9]*">
+        </div>
+        <button class="btn-agregar btn-agregar-combo">🎁 Agregar combo</button>
+    `;
+
+    const inputQty   = card.querySelector('.input-qty-card');
+    const btnAgregar = card.querySelector('.btn-agregar-combo');
+
+    inputQty.addEventListener('focus', () => inputQty.select());
+    inputQty.addEventListener('click', () => setTimeout(() => inputQty.select(), 0));
+    inputQty.addEventListener('input', () => {
+        inputQty.value = inputQty.value.replace(/[^0-9]/g, '');
+        const v = parseInt(inputQty.value);
+        if (v > 99) inputQty.value = 99;
+    });
+    inputQty.addEventListener('blur', () => {
+        const v = parseInt(inputQty.value);
+        if (inputQty.value !== '' && (isNaN(v) || v < 1)) inputQty.value = '';
+    });
+    inputQty.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            agregarComboAlCarrito(combo, parseInt(inputQty.value) || 1);
+            inputQty.value = '';
+            inputQty.blur();
+        }
+    });
+    btnAgregar.addEventListener('click', () => {
+        agregarComboAlCarrito(combo, parseInt(inputQty.value) || 1);
+        inputQty.value = '';
+    });
+
+    return card;
+}
+
+function crearSeccionCombos() {
+    const seccion = document.createElement('div');
+    seccion.className  = 'categoria-seccion combos-seccion';
+    seccion.dataset.cat = 'combos';
+
+    const titulo = document.createElement('h2');
+    titulo.className   = 'categoria-titulo';
+    titulo.textContent = '🎁 Combos Especiales';
+    seccion.appendChild(titulo);
+
+    const grid = document.createElement('div');
+    grid.className = 'categoria-grid';
+    combos.forEach((combo, idx) => grid.appendChild(crearTarjetaCombo(combo, idx)));
+    seccion.appendChild(grid);
+    return seccion;
+}
+
+function renderSoloCombos() {
+    productosGrid.innerHTML = '';
+    if (combos.length === 0) {
+        emptyMsg.style.display  = 'block';
+        emptyMsg.textContent    = 'No hay combos disponibles.';
+        return;
+    }
+    emptyMsg.style.display = 'none';
+    productosGrid.appendChild(crearSeccionCombos());
+}
+
+function renderTodas() {
+    productosGrid.innerHTML = '';
+    const hayContenido = productos.length > 0 || combos.length > 0;
+    emptyMsg.style.display = hayContenido ? 'none' : 'block';
+    if (!hayContenido) return;
+
+    if (combos.length > 0) productosGrid.appendChild(crearSeccionCombos());
+
+    const grupos = {};
+    productos.forEach(p => {
+        const cat = p.categoria || 'Otras';
+        if (!grupos[cat]) grupos[cat] = [];
+        grupos[cat].push(p);
+    });
+    const catsEnUso  = Object.keys(grupos);
+    const ordenFinal = [
+        ...ORDEN_CATEGORIAS.filter(c => catsEnUso.includes(c)),
+        ...catsEnUso.filter(c => !ORDEN_CATEGORIAS.includes(c))
+    ];
+    let idxG = 0;
+    ordenFinal.forEach(cat => {
+        const seccion = document.createElement('div');
+        seccion.className   = 'categoria-seccion';
+        seccion.dataset.cat = cat;
+        const grid = document.createElement('div');
+        grid.className = 'categoria-grid';
+        grupos[cat].forEach(p => grid.appendChild(crearTarjetaProducto(p, idxG++)));
+        seccion.appendChild(grid);
+        productosGrid.appendChild(seccion);
+    });
+}
+
+function agregarComboAlCarrito(combo, qty) {
+    qty = parseInt(qty) || 1;
+    if (qty < 1) qty = 1;
+    const existente = carrito.find(i => i.combo && i.combo.id === combo.id);
+    if (existente) existente.qty += qty;
+    else           carrito.push({ combo, qty });
+    actualizarCarritoUI();
+    abrirCarrito();
+}
+
+function quitarComboDelCarrito(comboId) {
+    carrito = carrito.filter(i => !(i.combo && i.combo.id === comboId));
+    actualizarCarritoUI();
+}
+
+function cambiarQtyCombo(comboId, delta) {
+    const item = carrito.find(i => i.combo && i.combo.id === comboId);
+    if (!item) return;
+    item.qty += delta;
+    if (item.qty <= 0) { quitarComboDelCarrito(comboId); return; }
+    actualizarCarritoUI();
 }
 
 inputBuscar.addEventListener('input', () => {
@@ -369,7 +539,7 @@ inputBuscar.addEventListener('input', () => {
     document.querySelectorAll('.btn-categoria').forEach(b => b.classList.remove('activa'));
     const btnTodas = document.querySelector('.btn-categoria[data-cat="todas"]');
     if (btnTodas) btnTodas.classList.add('activa');
-    if (!term) { renderProductos(productos, true); return; }
+    if (!term) { renderTodas(); return; }
     renderProductos(productos.filter(p =>
         p.nombre.toLowerCase().includes(term) ||
         (p['codigoBarras'] && p['codigoBarras'].includes(term))
@@ -419,9 +589,15 @@ async function cambiarQty(productoId, delta) {
     actualizarCarritoUI();
 }
 
+function itemPrecio(i) {
+    return i.combo
+        ? Number(i.combo.precio || i.combo.precio_total || 0)
+        : Number(i.producto.precio);
+}
+
 function actualizarCarritoUI() {
     const totalItems  = carrito.reduce((s, i) => s + i.qty, 0);
-    const totalPrecio = carrito.reduce((s, i) => s + i.qty * Number(i.producto.precio), 0);
+    const totalPrecio = carrito.reduce((s, i) => s + i.qty * itemPrecio(i), 0);
 
     carritoCount.textContent = totalItems;
     carritoTotal.textContent = totalPrecio.toLocaleString('es-CO');
@@ -435,32 +611,59 @@ function actualizarCarritoUI() {
     carrito.forEach(item => {
         const fila = document.createElement('div');
         fila.className = 'carrito-item-row';
-        fila.innerHTML = `
-            <img class="carrito-item-img"
-                 src="${item.producto.imagen || 'https://via.placeholder.com/60'}"
-                 alt="${item.producto.nombre}"
-                 onerror="this.src='https://via.placeholder.com/60'">
-            <div class="carrito-item-info">
-                <div class="carrito-item-nombre">${item.producto.nombre}</div>
-                <div class="carrito-item-precio">$${(item.qty * Number(item.producto.precio)).toLocaleString('es-CO')}</div>
-            </div>
-            <div class="carrito-item-controles">
-                <button class="btn-qty" data-id="${item.producto.id}" data-delta="1">+</button>
-                <span class="qty-num">${item.qty}</span>
-                <button class="btn-qty" data-id="${item.producto.id}" data-delta="-1">−</button>
-                <button class="btn-quitar-item" data-id="${item.producto.id}">✕ quitar</button>
-            </div>
-        `;
+        const precio = itemPrecio(item);
+
+        if (item.combo) {
+            const imgSrc = item.combo.imagen || 'https://via.placeholder.com/60?text=C';
+            fila.innerHTML = `
+                <img class="carrito-item-img" src="${imgSrc}" alt="${item.combo.nombre}"
+                     onerror="this.src='https://via.placeholder.com/60?text=C'">
+                <div class="carrito-item-info">
+                    <div class="carrito-item-nombre">🎁 ${item.combo.nombre}</div>
+                    <div class="carrito-item-precio">$${(item.qty * precio).toLocaleString('es-CO')}</div>
+                </div>
+                <div class="carrito-item-controles">
+                    <button class="btn-qty" data-combo-id="${item.combo.id}" data-delta="1">+</button>
+                    <span class="qty-num">${item.qty}</span>
+                    <button class="btn-qty" data-combo-id="${item.combo.id}" data-delta="-1">−</button>
+                    <button class="btn-quitar-item" data-combo-id="${item.combo.id}">✕ quitar</button>
+                </div>
+            `;
+        } else {
+            fila.innerHTML = `
+                <img class="carrito-item-img"
+                     src="${item.producto.imagen || 'https://via.placeholder.com/60'}"
+                     alt="${item.producto.nombre}"
+                     onerror="this.src='https://via.placeholder.com/60'">
+                <div class="carrito-item-info">
+                    <div class="carrito-item-nombre">${item.producto.nombre}</div>
+                    <div class="carrito-item-precio">$${(item.qty * precio).toLocaleString('es-CO')}</div>
+                </div>
+                <div class="carrito-item-controles">
+                    <button class="btn-qty" data-id="${item.producto.id}" data-delta="1">+</button>
+                    <span class="qty-num">${item.qty}</span>
+                    <button class="btn-qty" data-id="${item.producto.id}" data-delta="-1">−</button>
+                    <button class="btn-quitar-item" data-id="${item.producto.id}">✕ quitar</button>
+                </div>
+            `;
+        }
         carritoItems.appendChild(fila);
     });
 
     carritoItems.querySelectorAll('.btn-qty').forEach(btn => {
-        btn.addEventListener('click', () =>
-            cambiarQty(parseInt(btn.dataset.id), parseInt(btn.dataset.delta))
-        );
+        btn.addEventListener('click', () => {
+            if (btn.dataset.comboId) {
+                cambiarQtyCombo(parseInt(btn.dataset.comboId), parseInt(btn.dataset.delta));
+            } else {
+                cambiarQty(parseInt(btn.dataset.id), parseInt(btn.dataset.delta));
+            }
+        });
     });
     carritoItems.querySelectorAll('.btn-quitar-item').forEach(btn => {
-        btn.addEventListener('click', () => quitarDelCarrito(parseInt(btn.dataset.id)));
+        btn.addEventListener('click', () => {
+            if (btn.dataset.comboId) quitarComboDelCarrito(parseInt(btn.dataset.comboId));
+            else                      quitarDelCarrito(parseInt(btn.dataset.id));
+        });
     });
 }
 
@@ -487,13 +690,16 @@ btnCheckout.addEventListener('click', async () => {
 });
 
 function abrirModalCheckout() {
-    const total = carrito.reduce((s, i) => s + i.qty * Number(i.producto.precio), 0);
-    checkoutResumen.innerHTML = carrito.map(item => `
-        <div class="checkout-resumen-item">
-            <span>${item.qty}x ${item.producto.nombre}</span>
-            <span>$${(item.qty * Number(item.producto.precio)).toLocaleString('es-CO')}</span>
-        </div>
-    `).join('');
+    const total = carrito.reduce((s, i) => s + i.qty * itemPrecio(i), 0);
+    checkoutResumen.innerHTML = carrito.map(item => {
+        const precio  = itemPrecio(item);
+        const nombre  = item.combo ? `🎁 ${item.combo.nombre}` : item.producto.nombre;
+        return `
+            <div class="checkout-resumen-item">
+                <span>${item.qty}x ${nombre}</span>
+                <span>$${(item.qty * precio).toLocaleString('es-CO')}</span>
+            </div>`;
+    }).join('');
     checkoutTotalFinal.textContent = total.toLocaleString('es-CO');
     modalCheckout.style.display    = 'flex';
 }
@@ -524,7 +730,7 @@ btnConfirmarPedido.addEventListener('click', async () => {
         return;
     }
 
-    const total = carrito.reduce((s, i) => s + i.qty * Number(i.producto.precio), 0);
+    const total = carrito.reduce((s, i) => s + i.qty * itemPrecio(i), 0);
 
     btnConfirmarPedido.disabled    = true;
     btnConfirmarPedido.textContent = 'Procesando...';
@@ -549,14 +755,28 @@ btnConfirmarPedido.addEventListener('click', async () => {
 
         if (pedidoError) throw pedidoError;
 
-        const items = carrito.map(i => ({
-            pedido_id:  pedidoData.id,
-            product_id: i.producto.id,
-            nombre:     i.producto.nombre,
-            cantidad:   i.qty,
-            precio:     Number(i.producto.precio),
-            subtotal:   i.qty * Number(i.producto.precio)
-        }));
+        const items = carrito.map(i => {
+            const precio = itemPrecio(i);
+            if (i.combo) {
+                return {
+                    pedido_id:  pedidoData.id,
+                    product_id: null,
+                    combo_id:   i.combo.id,
+                    nombre:     `🎁 Combo: ${i.combo.nombre}`,
+                    cantidad:   i.qty,
+                    precio,
+                    subtotal:   i.qty * precio
+                };
+            }
+            return {
+                pedido_id:  pedidoData.id,
+                product_id: i.producto.id,
+                nombre:     i.producto.nombre,
+                cantidad:   i.qty,
+                precio,
+                subtotal:   i.qty * precio
+            };
+        });
 
         const { error: itemsError } = await sb.from('items_pedido').insert(items);
         if (itemsError) throw itemsError;
