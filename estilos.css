@@ -1175,20 +1175,20 @@ body {
    COMBOS
 ================================================================ */
 .btn-categoria-combos {
-  background: linear-gradient(135deg, #0c566c, #1a7b98);
+  background: rgba(12,86,108,0.08);
   border-color: var(--primary);
-  color: #fff !important;
+  color: var(--primary) !important;
 }
 
 .btn-categoria-combos:hover {
-  background: linear-gradient(135deg, #1a7b98, #0c566c);
-  color: #fff !important;
+  background: rgba(12,86,108,0.18);
+  color: var(--primary) !important;
 }
 
 .btn-categoria-combos.activa {
   background: linear-gradient(135deg, #0c566c, #1a7b98) !important;
   border-color: var(--primary) !important;
-  color: var(--accent) !important;
+  color: #fff !important;
   box-shadow: 0 4px 14px rgba(12,86,108,0.4);
 }
 
