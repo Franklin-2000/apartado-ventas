@@ -374,6 +374,8 @@ function filtrarPorCategoria(cat) {
 // ================================================================
 async function cargarCombos() {
     if (!adminUserId) return;
+
+    // Primero intentar con join completo
     const { data, error } = await sb
         .from('combos')
         .select(`
@@ -385,7 +387,22 @@ async function cargarCombos() {
         `)
         .eq('user_id', adminUserId)
         .order('nombre', { ascending: true });
-    if (error) { console.error('Error cargando combos:', error); return; }
+
+    if (error) {
+        console.error('Error cargando combos (join):', error);
+        // Fallback: cargar combos sin join (solo datos básicos)
+        const { data: data2, error: error2 } = await sb
+            .from('combos')
+            .select('*')
+            .eq('user_id', adminUserId)
+            .order('nombre', { ascending: true });
+        if (error2) {
+            console.error('Error cargando combos (básico):', error2);
+            return;
+        }
+        combos = (data2 || []).map(c => ({ ...c, combo_productos: [] }));
+        return;
+    }
     combos = data || [];
 }
 
